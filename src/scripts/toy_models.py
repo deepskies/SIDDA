@@ -6,6 +6,8 @@ from escnn import nn as escnn_nn
 import cnn
 import torchvision
 from torchsummary import summary
+from torchvision import transforms
+import numpy as np
 
 num_classes = 10
 feature_fields = [12, 24, 48, 48, 48, 48, 96, 96, 96, 112, 192]    
@@ -45,7 +47,7 @@ class ConvBlock(nn.Module):
 class GeneralSteerableCNN(torch.nn.Module):
     
     def __init__(
-        self, N, n_classes=num_classes, 
+        self, N, num_classes=num_classes, 
         feature_fields = feature_fields, reflections = False, maximum_frequency = None
     ):
         super(GeneralSteerableCNN, self).__init__()
@@ -126,7 +128,7 @@ class GeneralSteerableCNN(torch.nn.Module):
             torch.nn.Linear(64, 32),
             torch.nn.BatchNorm1d(32),
             torch.nn.ELU(inplace=True),
-            torch.nn.Linear(32, n_classes),
+            torch.nn.Linear(32, num_classes),
         )
     
     def forward(self, input: torch.Tensor):
@@ -151,8 +153,7 @@ class GeneralSteerableCNN(torch.nn.Module):
         features = x.tensor.squeeze(-1).squeeze(-1) 
         x = x.tensor
         x = self.fully_net(x.reshape(x.shape[0], -1))
-
-        return features, x
+        return x
 
 
 def load_d1():
@@ -220,7 +221,7 @@ model_dict = {
 }
 
 if __name__ == '__main__':
-    model = GeneralSteerableCNN(N=1,reflections=True, n_classes=2)
-    model.eval()
-    
-    summary(model, (1, 100, 100))
+    model = GeneralSteerableCNN(N=1,reflections=True, num_classes=10)
+    x = torch.randn(32, 1, 100 ,100)
+    print(x.shape)
+    print(model(x))

@@ -212,7 +212,7 @@ def plot_predictions(eval_loader: DataLoader, model: nn.Module):
         
 
 def main(config):
-    model = GeneralSteerableCNN(N=4, reflections=True, num_classes = 3)
+    model = GeneralSteerableCNN(N=4, reflections=True, n_classes = 3)
     model_name = 'D4'
     params_to_optimize = [p for p in model.parameters() if p.requires_grad]
     optimizer = optim.AdamW(params_to_optimize, 

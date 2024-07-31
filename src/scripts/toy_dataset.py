@@ -4,7 +4,7 @@ from torch.utils.data import Dataset
 import matplotlib.pyplot as plt
 from torchvision import transforms
 from typing import Callable, Optional
-
+from torch.utils.data import DataLoader
 class Shapes(Dataset):
     def __init__(self, input_path: str, output_path: str, transform: Optional[Callable] = None):
         self.input_path = input_path
@@ -71,12 +71,30 @@ if __name__ == '__main__':
     
     input_path_blob = '/Users/snehpandya/Projects/GCNN_DA/data/toy_dataset_blob/blob_data_noisy.npy'
     output_path_blob = '/Users/snehpandya/Projects/GCNN_DA/data/toy_dataset_blob/blob_labels_noisy.npy'
+    train_transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.RandomRotation(180),
+        transforms.Resize(100),
+        transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
+        transforms.RandomHorizontalFlip(p=0.3),
+        transforms.RandomVerticalFlip(p=0.3),
+        transforms.Normalize(mean=(0.5, ), std=(0.5,))
+    ])
+    shape_dataset = Shapes(input_path_shapes, output_path_shapes, transform=train_transform)
+    batch_size = 32  # You can set this to any value you want
+
+    # Wrap the dataset in a DataLoader
+    data_loader = DataLoader(shape_dataset, batch_size=batch_size, shuffle=True)
+
+    # Get a single batch from the DataLoader
+    batch = next(iter(data_loader))
+
+    # If your dataset returns both inputs and targets, you might need to unpack them:
+    inputs, targets = batch
+        # Get the shape of the inputs and targets
+    input_shape = inputs.shape
+    target_shape = targets.shape
     
-    shape_dataset = Shapes(input_path_shapes, output_path_shapes, transform=transforms.ToTensor())
-    blob_dataset = Blobs(input_path_blob, output_path_blob, transform=transforms.ToTensor())
-    
-    plt.imshow(shape_dataset[0][0].permute(1, 2, 0))
-    plt.show()
-    plt.imshow(blob_dataset[0][0].permute(1, 2, 0))
-    plt.show()
+    print(f"Input shape: {input_shape}")
+    print(f"Target shape: {target_shape}")
     
