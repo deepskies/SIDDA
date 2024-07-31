@@ -18,8 +18,8 @@ from toy_dataset import Shapes
 from tqdm import tqdm
 import random
 import copy
-import ot
-import geomloss
+# import ot
+# import geomloss
 
 def sinkhorn_loss(x, 
                   y, 
@@ -232,12 +232,12 @@ def main(config):
         transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
         transforms.RandomHorizontalFlip(p=0.3),
         transforms.RandomVerticalFlip(p=0.3),
-        transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
+        transforms.Normalize(mean=(0.5, ), std=(0.5,))
     ])
     
     val_transform = transforms.Compose([
         transforms.ToTensor(),
-        transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)),
+        transforms.Normalize(mean=(0.5, ), std=(0.5,)),
         transforms.Resize(100)
     ])
     
