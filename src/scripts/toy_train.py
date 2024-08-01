@@ -73,6 +73,7 @@ def train_model(model,
         for i, batch in tqdm(enumerate(train_dataloader)):
             inputs, targets = batch
             inputs, targets = inputs.to(device), targets.to(device)
+            inputs = inputs.float()
 
             optimizer.zero_grad()
             outputs = model(inputs)
@@ -98,6 +99,7 @@ def train_model(model,
                 for batch in val_dataloader:
                     inputs, targets = batch
                     inputs, targets = inputs.to(device), targets.to(device)
+                    inputs = inputs.float()
                     outputs = model(inputs)
                     loss = F.cross_entropy(outputs, targets)
                     val_loss += loss.item()
@@ -114,15 +116,21 @@ def train_model(model,
                 best_val_acc = val_acc
                 no_improvement_count = 0
                 best_val_epoch = epoch + 1
-                torch.save(model.eval().module.state_dict(), os.path.join(save_dir, f"best_model.pt"))
+                if torch.cuda.device_count() > 1:
+                    torch.save(model.eval().module.state_dict(), os.path.join(save_dir, f"best_model.pt"))
+                else:
+                    torch.save(model.eval().state_dict(), os.path.join(save_dir, f"best_model.pt"))
             else:
                 no_improvement_count += 1
 
             if no_improvement_count >= early_stopping_patience:
                 print(f"Early stopping after {early_stopping_patience} epochs without improvement.")
                 break
-
-    torch.save(model.eval().module.state_dict(), os.path.join(save_dir, "final_model.pt"))
+    
+    if torch.cuda.device_count() > 1:
+        torch.save(model.eval().module.state_dict(), os.path.join(save_dir, "final_model.pt"))
+    else:
+        torch.save(model.eval().state_dict(), os.path.join(save_dir, "final_model.pt"))
     np.save(os.path.join(save_dir, f"losses-{model_name}.npy"), np.array(losses))
     np.save(os.path.join(save_dir, f"steps-{model_name}.npy"), np.array(steps))
 
@@ -212,7 +220,7 @@ def plot_predictions(eval_loader: DataLoader, model: nn.Module):
         
 
 def main(config):
-    model = GeneralSteerableCNN(N=4, reflections=True, n_classes = 3)
+    model = GeneralSteerableCNN(N=4, reflections=True, num_classes = 3)
     model_name = 'D4'
     params_to_optimize = [p for p in model.parameters() if p.requires_grad]
     optimizer = optim.AdamW(params_to_optimize, 
