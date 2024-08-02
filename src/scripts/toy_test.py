@@ -45,8 +45,9 @@ def compute_metrics(test_loader, model, model_name, save_dir, output_name):
     model.eval()
 
     for batch in tqdm(test_loader, unit="batch", total=len(test_loader)):
-        input, label, _, _ = batch
+        input, label = batch
         input, label = input.to(device), label.to(device)
+        input = input.float()
         outputs = model(input)
         pred_labels = torch.argmax(outputs, dim=-1).cpu().numpy()
         
