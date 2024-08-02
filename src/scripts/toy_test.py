@@ -56,7 +56,7 @@ def compute_metrics(test_loader, model, model_name, save_dir, output_name):
 
 
 @torch.no_grad()
-def main(model_dir, output_name, data_path, N=None, adversarial_attack=False):
+def main(model_dir, output_name, x_test_path, y_test_path, N=None, adversarial_attack=False):
     if adversarial_attack:
         transform = transforms.Compose([
             transforms.ToTensor(),
@@ -70,7 +70,7 @@ def main(model_dir, output_name, data_path, N=None, adversarial_attack=False):
             transforms.Normalize(mean=(0.5, ), std=(0.5, )),
         ])
 
-    test_dataset = Shapes(data_path, transform)
+    test_dataset = Shapes(x_test_path, y_test_path, transform)
     test_dataloader = DataLoader(test_dataset, batch_size=128, shuffle=True)
 
     if N is not None:
