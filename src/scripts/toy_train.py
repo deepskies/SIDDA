@@ -13,7 +13,7 @@ from torch import nn
 from torch.nn import functional as F
 from torch import optim
 from torchvision import transforms
-from toy_models import GeneralSteerableCNN, feature_fields
+from toy_models import d4_model, feature_fields
 from toy_dataset import Shapes
 from tqdm import tqdm
 import random
@@ -21,16 +21,16 @@ import copy
 # import ot
 # import geomloss
 
-def sinkhorn_loss(x, 
-                  y, 
-                  p=2, 
-                  blur=0.05,
-                  scaling=0.9, 
-                  max_iter=100, 
-                  reach=4
-            ):
-    loss = geomloss.SamplesLoss(loss='sinkhorn', p=p, blur=blur, scaling=scaling, reach=reach, max_iter=max_iter)
-    return loss(x, y)
+# def sinkhorn_loss(x, 
+#                   y, 
+#                   p=2, 
+#                   blur=0.05,
+#                   scaling=0.9, 
+#                   max_iter=100, 
+#                   reach=4
+#             ):
+#     loss = geomloss.SamplesLoss(loss='sinkhorn', p=p, blur=blur, scaling=scaling, reach=reach, max_iter=max_iter)
+#     return loss(x, y)
 
 
 def set_all_seeds(num):
@@ -78,6 +78,9 @@ def train_model(model,
             optimizer.zero_grad()
             outputs = model(inputs)
             loss = F.cross_entropy(outputs, targets)
+            
+            # if config['OT']:
+            #     loss = sinkhorn_loss(outputs, targets)
             loss.backward()
             optimizer.step()
 
@@ -220,7 +223,7 @@ def plot_predictions(eval_loader: DataLoader, model: nn.Module):
         
 
 def main(config):
-    model = GeneralSteerableCNN(N=4, reflections=True, num_classes = 3)
+    model = d4_model()
     model_name = 'D4'
     params_to_optimize = [p for p in model.parameters() if p.requires_grad]
     optimizer = optim.AdamW(params_to_optimize, 
@@ -298,7 +301,7 @@ def main(config):
     yaml.dump(config, file)
     file.close()
     
-    plot_confusion_matrix(data_loader = val_dataloader, save_dir = save_dir, model = model)
+    # plot_confusion_matrix(data_loader = val_dataloader, save_dir = save_dir, model = model)
 
     
 if __name__ == '__main__':
