@@ -26,7 +26,7 @@ def load_model(directory_path, model_name='D4'):
     device = ('cuda' if torch.cuda.is_available() else 'cpu')
     
     model = None
-    file_path = os.path.join(directory_path, f'{model_name}.pt')
+    file_path = os.path.join(directory_path, 'best_model.pt')
     
     if os.path.isfile(file_path):
         print(f'Loading {model_name}...')
