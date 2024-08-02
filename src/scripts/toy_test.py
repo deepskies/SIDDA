@@ -15,15 +15,27 @@ from toy_models import d4_model
 from toy_dataset import Shapes
 from utils import OnePixelAttack
 
-device = ('cuda' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 classes = (
     'lines', 'rectangles', 'circles'
 )
 
-def load_model(checkpoint_path):
-    model = d4_model()
-    model.load_state_dict(torch.load(checkpoint_path, map_location=device))
+# Assuming model_dict is already defined and contains 'D4'
+def load_model(directory_path, model_name='D4'):
+    device = ('cuda' if torch.cuda.is_available() else 'cpu')
+    
+    model = None
+    file_path = os.path.join(directory_path, f'{model_name}.pt')
+    
+    if os.path.isfile(file_path):
+        print(f'Loading {model_name}...')
+        model = d4_model()
+        model.eval()
+        model.load_state_dict(torch.load(file_path, map_location=device))
+        print(f'Finished Loading {model_name}')
+    
+    return model
 
 @torch.no_grad()
 def compute_metrics(test_loader, model, model_name, save_dir, output_name):
@@ -54,86 +66,72 @@ def compute_metrics(test_loader, model, model_name, save_dir, output_name):
     
     return sklearn_report
 
-
 @torch.no_grad()
 def main(model_dir, output_name, x_test_path, y_test_path, N=None, adversarial_attack=False):
     if adversarial_attack:
         transform = transforms.Compose([
             transforms.ToTensor(),
             transforms.Resize(255),
-            transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)),
+            transforms.Normalize(mean=(0.5,), std=(0.5,)),
             OnePixelAttack()
         ])
     else:
         transform = transforms.Compose([
             transforms.ToTensor(),
-            transforms.Normalize(mean=(0.5, ), std=(0.5, )),
+            transforms.Normalize(mean=(0.5,), std=(0.5,)),
+            transforms.Resize(255)
         ])
 
-    test_dataset = Shapes(x_test_path, y_test_path, transform)
+    test_dataset = Shapes(x_test_path, y_test_path, transform=transform)
     test_dataloader = DataLoader(test_dataset, batch_size=128, shuffle=True)
 
-    if N is not None:
-        trained_models = load_model(model_dir)
-        print('Model Loaded!')
-        
-        model_metrics = {model_name: {class_name: {"precision": [], "recall": [], "f1-score": [], "support": []} 
-                                      for class_name in classes} 
-                         for model_name in trained_models.keys()}
-        
-        
-        for model_name in model_metrics:
-            model_metrics[model_name]['accuracy'] = []
-            model_metrics[model_name]['macro avg'] = {"precision": [], "recall": [], "f1-score": [], "support": []}
-            model_metrics[model_name]['weighted avg'] = {"precision": [], "recall": [], "f1-score": [], "support": []}
+    model_name = 'D4'
+    model = load_model(model_dir, model_name)
+    if model is None:
+        print(f"Model {model_name} could not be loaded.")
+        return
     
+    model_metrics = {class_name: {"precision": [], "recall": [], "f1-score": [], "support": []} 
+                     for class_name in classes}
+    model_metrics['accuracy'] = []
+    model_metrics['macro avg'] = {"precision": [], "recall": [], "f1-score": [], "support": []}
+    model_metrics['weighted avg'] = {"precision": [], "recall": [], "f1-score": [], "support": []}
 
+    if N is not None:
         for i in range(N):
             print(f"Starting evaluation {i + 1} of {N}")
-            for model_name, model in tqdm(trained_models.items()):
-                full_report = compute_metrics(test_loader=test_dataloader, model=model, 
-                                              model_name=f"{model_name}_{i + 1}", save_dir=model_dir, output_name=output_name)
-                
-                # Append the metrics of this iteration to the respective lists
-                for class_name in classes:
-                    for metric in ["precision", "recall", "f1-score", "support"]:
-                        model_metrics[model_name][class_name][metric].append(float(full_report[class_name][metric]))
-                        
-                # Append accuracy, macro avg, and weighted avg
-                model_metrics[model_name]['accuracy'].append(float(full_report['accuracy']))
-                for metric in ["precision", "recall", "f1-score", "support"]:
-                    model_metrics[model_name]['macro avg'][metric].append(float(full_report['macro avg'][metric]))
-                    model_metrics[model_name]['weighted avg'][metric].append(float(full_report['weighted avg'][metric]))
-    
-        # Compute the mean of the metrics across all iterations
-        for model_name in model_metrics:
+            full_report = compute_metrics(test_loader=test_dataloader, model=model, 
+                                          model_name=f"{model_name}_{i + 1}", save_dir=model_dir, output_name=output_name)
+            
+            # Append the metrics of this iteration to the respective lists
             for class_name in classes:
                 for metric in ["precision", "recall", "f1-score", "support"]:
-                    model_metrics[model_name][class_name][metric] = float(np.mean(model_metrics[model_name][class_name][metric]))
-
-            # Compute the mean of accuracy, macro avg, and weighted avg
-            model_metrics[model_name]['accuracy'] = float(np.mean(model_metrics[model_name]['accuracy']))
+                    model_metrics[class_name][metric].append(float(full_report[class_name][metric]))
+                    
+            # Append accuracy, macro avg, and weighted avg
+            model_metrics['accuracy'].append(float(full_report['accuracy']))
             for metric in ["precision", "recall", "f1-score", "support"]:
-                model_metrics[model_name]['macro avg'][metric] = float(np.mean(model_metrics[model_name]['macro avg'][metric]))
-                model_metrics[model_name]['weighted avg'][metric] = float(np.mean(model_metrics[model_name]['weighted avg'][metric]))
-
-        print('Compiling All Metrics')
-        with open(f'{model_dir}/{output_name}.yaml', 'w') as file:
-            yaml.dump(model_metrics, file)
+                model_metrics['macro avg'][metric].append(float(full_report['macro avg'][metric]))
+                model_metrics['weighted avg'][metric].append(float(full_report['weighted avg'][metric]))
         
+        # Compute the mean of the metrics across all iterations
+        for class_name in classes:
+            for metric in ["precision", "recall", "f1-score", "support"]:
+                model_metrics[class_name][metric] = float(np.mean(model_metrics[class_name][metric]))
+
+        # Compute the mean of accuracy, macro avg, and weighted avg
+        model_metrics['accuracy'] = float(np.mean(model_metrics['accuracy']))
+        for metric in ["precision", "recall", "f1-score", "support"]:
+            model_metrics['macro avg'][metric] = float(np.mean(model_metrics['macro avg'][metric]))
+            model_metrics['weighted avg'][metric] = float(np.mean(model_metrics['weighted avg'][metric]))
+
     else:
-        trained_models = load_model(model_dir)
-        print('All Models Loaded!')
-        
-        model_metrics = dict.fromkeys(trained_models.keys())
-        
-        for model_name, model in tqdm(trained_models.items()):
-            full_report = compute_metrics(test_loader=test_dataloader, model=model, model_name=model_name, save_dir=model_dir, output_name=output_name)
-            model_metrics[model_name] = full_report
+        full_report = compute_metrics(test_loader=test_dataloader, model=model, model_name=model_name, save_dir=model_dir, output_name=output_name)
+        model_metrics = full_report
 
-        print('Compiling All Metrics')
-        with open(f'{model_dir}/{output_name}.yaml', 'w') as file:
-            yaml.dump(model_metrics, file)
+    print('Compiling Metrics')
+    with open(f'{model_dir}/{output_name}.yaml', 'w') as file:
+        yaml.dump(model_metrics, file)
 
     print(f'Metrics saved at {model_dir}/{output_name}.yaml')
 

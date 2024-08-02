@@ -120,9 +120,9 @@ def train_model(model,
                 no_improvement_count = 0
                 best_val_epoch = epoch + 1
                 if torch.cuda.device_count() > 1:
-                    torch.save(model.eval().module.state_dict(), os.path.join(save_dir, f"best_model.pt"))
+                    torch.save(model.eval().module.state_dict(), os.path.join(save_dir, "best_model.pt"))
                 else:
-                    torch.save(model.eval().state_dict(), os.path.join(save_dir, f"best_model.pt"))
+                    torch.save(model.eval().state_dict(), os.path.join(save_dir, "best_model.pt"))
             else:
                 no_improvement_count += 1
 

@@ -157,7 +157,7 @@ class GeneralSteerableCNN(torch.nn.Module):
 
 
 def d4_model():
-    model = GeneralSteerableCNN(N=1,reflections=True, num_classes=3)
+    model = GeneralSteerableCNN(N=4,reflections=True, num_classes=3)
     return model
 
 if __name__ == '__main__':
