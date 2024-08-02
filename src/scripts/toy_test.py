@@ -140,9 +140,10 @@ def main(model_dir, output_name, x_test_path, y_test_path, N=None, adversarial_a
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Evaluate Galaxy10 models')
     parser.add_argument('--model_path', type=str, required=True, help='Path to the trained models')
-    parser.add_argument('--data_path', type=str, required=True, help='Path to the test data file')
+    parser.add_argument('--x_test_path', type=str, required=True, help='Path to the x_test data')
+    parser.add_argument('--y_test_path', type=str, required=True, help='Path to the y_test data')
     parser.add_argument('--output_name', type=str, required=True, help='Name of the output file for the results')
     parser.add_argument('--adversarial_attack', action='store_true', help='Apply adversarial attack to the input data')
     args = parser.parse_args()
     
-    main(model_dir=args.model_path, output_name=args.output_name, data_path=args.data_path, adversarial_attack=args.adversarial_attack)
+    main(model_dir=args.model_path, output_name=args.output_name, x_test_path=args.x_test_path, y_test_path=args.y_test_path, adversarial_attack=args.adversarial_attack)
