@@ -156,72 +156,14 @@ class GeneralSteerableCNN(torch.nn.Module):
         return x
 
 
-def load_d1():
-    D1_model = GeneralSteerableCNN(N=1,reflections=True)
-    return D1_model
-
-def load_d2():
-    D2_model = GeneralSteerableCNN(N=2,reflections=True)
-    return D2_model
-
-def load_d4():
-    D4_model = GeneralSteerableCNN(N=4,reflections=True)
-    return D4_model
-
-def load_d8():
-    D8_model = GeneralSteerableCNN(N=8,reflections=True)
-    return D8_model
-
-def load_d16():
-    D16_model = GeneralSteerableCNN(N=16,reflections=True)
-    return D16_model
-
-def load_d32():
-    D32_model = GeneralSteerableCNN(N=32,reflections=True)
-    return D32_model
-
-def load_d64():
-    D64_model = GeneralSteerableCNN(N=64,reflections=True)
-    return D64_model
-
-def load_c1():
-    C1_model = GeneralSteerableCNN(N=1)
-    return C1_model
-
-def load_c2():
-    C2_model = GeneralSteerableCNN(N=2)
-    return C2_model
-
-def load_c4():
-    C4_model = GeneralSteerableCNN(N=4)
-    return C4_model
-
-def load_c8():
-    C8_model = GeneralSteerableCNN(N=8)
-    return C8_model 
-
-def load_c16():
-    C16_model = GeneralSteerableCNN(N=16)
-    return C16_model
-
-
-model_dict = {
-    'D1': load_d1,
-    'D2': load_d2,
-    'D4': load_d4,
-    'D8': load_d8,
-    'D16': load_d16,
-    'D32': load_d32,
-    'D64': load_d64,
-    'C1': load_c1,
-    'C2': load_c2,
-    'C4': load_c4,
-    'C8': load_c8,
-    'C16': load_c16
-}
+def d4_model():
+    model = GeneralSteerableCNN(N=1,reflections=True, num_classes=3)
+    return model
 
 if __name__ == '__main__':
     model = GeneralSteerableCNN(N=1,reflections=True, num_classes=10)
     x = torch.randn(32, 1, 100 ,100)
     print(x.shape)
+    print(type(x))
+    print(x.dtype)
     print(model(x))
