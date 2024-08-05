@@ -14,6 +14,7 @@ import torch.nn as nn
 from toy_models import d4_model
 from toy_dataset import Shapes
 from utils import OnePixelAttack
+from sklearn.manifold import Isomap
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -37,9 +38,10 @@ def load_model(directory_path, model_name='D4'):
     
     return model
 
+
 @torch.no_grad()
 def compute_metrics(test_loader, model, model_name, save_dir, output_name):
-    y_pred, y_true = [], []
+    y_pred, y_true, feature_maps = [], [], []
     model = nn.DataParallel(model)
     model.to(device)
     model.eval()
@@ -48,13 +50,23 @@ def compute_metrics(test_loader, model, model_name, save_dir, output_name):
         input, label = batch
         input, label = input.to(device), label.to(device)
         input = input.float()
-        outputs = model(input)
+        features, outputs = model(input)
         pred_labels = torch.argmax(outputs, dim=-1).cpu().numpy()
+        feature_maps.extend(features.cpu().numpy())
         
         y_pred.extend(pred_labels)
         y_true.extend(label.cpu().numpy())
     
-    y_pred, y_true = np.asarray(y_pred), np.asarray(y_true)  
+    y_pred, y_true = np.asarray(y_pred), np.asarray(y_true)
+    feature_maps = np.asarray(feature_maps)
+    flattened_features = feature_maps.reshape(feature_maps.shape[0], -1)
+    
+    isomap = Isomap(n_components=2, n_neighbors=5)
+    isomap_embedding = isomap.fit_transform(flattened_features.detach().cpu().numpy())
+    plt.scatter(isomap_embedding[:, 0], isomap_embedding[:, 1], c=y_pred, cmap='viridis')
+    plt.colorbar()
+    plt.savefig(os.path.join(save_dir, f"isomap_{model_name}_{output_name}.png"), bbox_inches='tight')
+  
     sklearn_report = classification_report(y_true, y_pred, output_dict=True, target_names=classes)
 
     cf_matrix = confusion_matrix(y_true, y_pred)
@@ -72,7 +84,7 @@ def main(model_dir, output_name, x_test_path, y_test_path, N=None, adversarial_a
     if adversarial_attack:
         transform = transforms.Compose([
             transforms.ToTensor(),
-            transforms.Resize(255),
+            transforms.Resize(100),
             transforms.Normalize(mean=(0.5,), std=(0.5,)),
             OnePixelAttack()
         ])
@@ -80,7 +92,7 @@ def main(model_dir, output_name, x_test_path, y_test_path, N=None, adversarial_a
         transform = transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize(mean=(0.5,), std=(0.5,)),
-            transforms.Resize(255)
+            transforms.Resize(100)
         ])
 
     test_dataset = Shapes(x_test_path, y_test_path, transform=transform)

@@ -76,7 +76,7 @@ def train_model(model,
             inputs = inputs.float()
 
             optimizer.zero_grad()
-            outputs = model(inputs)
+            features, outputs = model(inputs)
             loss = F.cross_entropy(outputs, targets)
             
             # if config['OT']:
@@ -103,7 +103,7 @@ def train_model(model,
                     inputs, targets = batch
                     inputs, targets = inputs.to(device), targets.to(device)
                     inputs = inputs.float()
-                    outputs = model(inputs)
+                    features, outputs = model(inputs)
                     loss = F.cross_entropy(outputs, targets)
                     val_loss += loss.item()
                     _, predicted = torch.max(outputs.data, 1)

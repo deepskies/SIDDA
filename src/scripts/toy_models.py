@@ -153,7 +153,7 @@ class GeneralSteerableCNN(torch.nn.Module):
         features = x.tensor.squeeze(-1).squeeze(-1) 
         x = x.tensor
         x = self.fully_net(x.reshape(x.shape[0], -1))
-        return x
+        return features, x
 
 
 def d4_model():
