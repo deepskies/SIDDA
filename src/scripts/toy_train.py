@@ -298,6 +298,16 @@ def train_model_da(model,
     else:
         torch.save(model.eval().state_dict(), os.path.join(save_dir, "final_model.pt"))
 
+    loss_dir = os.path.join(save_dir, 'losses')
+        # Saving losses and steps
+    np.save(os.path.join(loss_dir, f"losses-{model_name}.npy"), np.array(losses))
+    np.save(os.path.join(loss_dir, f"train_classification_losses-{model_name}.npy"), np.array(train_classification_losses))
+    np.save(os.path.join(loss_dir, f"train_domain_losses-{model_name}.npy"), np.array(train_domain_losses))
+    np.save(os.path.join(loss_dir, f"val_losses-{model_name}.npy"), np.array(val_losses))
+    np.save(os.path.join(loss_dir, f"val_classification_losses-{model_name}.npy"), np.array(val_classification_losses))
+    np.save(os.path.join(loss_dir, f"val_domain_losses-{model_name}.npy"), np.array(val_domain_losses))
+    np.save(os.path.join(loss_dir, f"steps-{model_name}.npy"), np.array(steps))
+    
     # Plotting the losses
     plt.figure(figsize=(14, 8))
     
@@ -314,8 +324,8 @@ def train_model_da(model,
     # Plot Validation Losses
     plt.subplot(2, 1, 2)
     plt.plot(steps // report_interval, val_losses, label='Validation Total Loss')
-    plt.plot(steps, val_classification_losses, label='Validation Classification Loss')
-    plt.plot(steps, val_domain_losses, label='Validation Domain Loss')
+    plt.plot(steps // report_interval, val_classification_losses, label='Validation Classification Loss')
+    plt.plot(steps // report_interval, val_domain_losses, label='Validation Domain Loss')
     plt.xlabel('Epochs')
     plt.ylabel('Loss')
     plt.title('Validation Losses')
@@ -324,17 +334,8 @@ def train_model_da(model,
     plt.tight_layout()
     plt.savefig(os.path.join(save_dir, f"losses_plot-{model_name}.png"))
     plt.show()
-    
-    # Saving losses and steps
-    np.save(os.path.join(save_dir, f"losses-{model_name}.npy"), np.array(losses))
-    np.save(os.path.join(save_dir, f"train_classification_losses-{model_name}.npy"), np.array(train_classification_losses))
-    np.save(os.path.join(save_dir, f"train_domain_losses-{model_name}.npy"), np.array(train_domain_losses))
-    np.save(os.path.join(save_dir, f"val_losses-{model_name}.npy"), np.array(val_losses))
-    np.save(os.path.join(save_dir, f"val_classification_losses-{model_name}.npy"), np.array(val_classification_losses))
-    np.save(os.path.join(save_dir, f"val_domain_losses-{model_name}.npy"), np.array(val_domain_losses))
-    np.save(os.path.join(save_dir, f"steps-{model_name}.npy"), np.array(steps))
 
-    return best_val_epoch, best_val_acc, losses[-1]
+    return best_val_epoch, best_val_acc, best_classification_epoch, best_classification_loss, best_domain_epoch, best_domain_loss, losses[-1]
 
 def main(config):
     model = d4_model()
@@ -420,22 +421,30 @@ def main(config):
     
     if config['DA']:
         save_dir = config['save_dir'] + config['model'] + '_DA_' + timestr
-        best_val_epoch, best_val_acc, final_loss = train_model_da(model, 
-                                                           train_dataloader=train_dataloader, 
-                                                           val_dataloader=val_dataloader, 
-                                                           target_dataloader=target_dataloader,
-                                                           target_val_dataloader=target_val_dataloader,
-                                                           scale_factor=config['parameters']['scale_factor'],
-                                                           optimizer=optimizer, 
-                                                           model_name=model_name, 
-                                                           scheduler=scheduler, 
-                                                           epochs=config['parameters']['epochs'], 
-                                                           device=device, 
-                                                           save_dir=save_dir,
-                                                           early_stopping_patience=config['parameters']['early_stopping'], 
-                                                           report_interval=config['parameters']['report_interval'],
-                                                    
-                                                        )
+        best_val_epoch, best_val_acc, best_classification_epoch, best_classification_loss, best_domain_epoch, best_domain_loss, final_loss = train_model_da(model=model,
+                                                                                                                                                    train_dataloader=train_dataloader, 
+                                                                                                                                                    val_dataloader=val_dataloader,
+                                                                                                                                                    target_dataloader=target_dataloader,
+                                                                                                                                                    target_val_dataloader=target_val_dataloader,
+                                                                                                                                                    scale_factor=config['parameters']['scale_factor'],
+                                                                                                                                                    optimizer=optimizer, 
+                                                                                                                                                    model_name=model_name, 
+                                                                                                                                                    scheduler=scheduler, 
+                                                                                                                                                    epochs=config['parameters']['epochs'], 
+                                                                                                                                                    device=device, 
+                                                                                                                                                    save_dir=save_dir,
+                                                                                                                                                    early_stopping_patience=config['parameters']['early_stopping'], 
+                                                                                                                                                    report_interval=config['parameters']['report_interval']
+                                                                                   )
+        print('Training Done')
+        config['best_val_acc'] = best_val_acc
+        config['best_val_epoch'] = best_val_epoch
+        config['final_loss'] = final_loss
+        config['feature_fields'] = feature_fields
+        config['best_classification_epoch'] = best_classification_epoch
+        config['best_classification_loss'] = best_classification_loss
+        config['best_domain_epoch'] = best_domain_epoch
+        config['best_domain_loss'] = best_domain_loss
         
     else:
         save_dir = config['save_dir'] + config['model'] + '_' + timestr
@@ -452,11 +461,11 @@ def main(config):
                                                            report_interval=config['parameters']['report_interval'],
                                                     
                                                         )
-    print('Training Done')
-    config['best_val_acc'] = best_val_acc
-    config['best_val_epoch'] = best_val_epoch
-    config['final_loss'] = final_loss
-    config['feature_fields'] = feature_fields
+        print('Training Done')
+        config['best_val_acc'] = best_val_acc
+        config['best_val_epoch'] = best_val_epoch
+        config['final_loss'] = final_loss
+        config['feature_fields'] = feature_fields
 
     file = open(f'{save_dir}/config.yaml',"w")
     yaml.dump(config, file)
