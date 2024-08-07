@@ -23,12 +23,12 @@ classes = (
 )
 
 
-def load_model(directory_path, model_name='D4'):
+def load_models(directory_path, model_name='D4'):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
-    model = None
+    models = []
     
-    # Search for a file that contains 'best_model' in its name
+    # Search for files that contain 'best_model' in their names
     for file_name in os.listdir(directory_path):
         if 'best_model' in file_name:
             file_path = os.path.join(directory_path, file_name)
@@ -38,13 +38,14 @@ def load_model(directory_path, model_name='D4'):
             model.eval()
             model.load_state_dict(torch.load(file_path, map_location=device))
             
-            print(f'Finished Loading {model_name}')
-            break
-        
-        if model is None:
-            print(f"No model containing 'best_model' found in {directory_path}.")
+            models.append((model, file_name))
+            print(f'Finished Loading {model_name} from {file_path}')
     
-    return model
+    if not models:
+        print(f"No models containing 'best_model' found in {directory_path}.")
+    
+    return models
+
 
 
 @torch.no_grad()
@@ -108,54 +109,58 @@ def main(model_dir, output_name, x_test_path, y_test_path, N=None, adversarial_a
     test_dataloader = DataLoader(test_dataset, batch_size=128, shuffle=True)
 
     model_name = 'D4'
-    model = load_model(model_dir, model_name)
-    if model is None:
-        print(f"Model {model_name} could not be loaded.")
+    models = load_models(model_dir, model_name)
+    if not models:
+        print(f"Models could not be loaded.")
         return
     
-    model_metrics = {class_name: {"precision": [], "recall": [], "f1-score": [], "support": []} 
-                     for class_name in classes}
-    model_metrics['accuracy'] = []
-    model_metrics['macro avg'] = {"precision": [], "recall": [], "f1-score": [], "support": []}
-    model_metrics['weighted avg'] = {"precision": [], "recall": [], "f1-score": [], "support": []}
+    for model, model_file_name in models:
+        model_metrics = {class_name: {"precision": [], "recall": [], "f1-score": [], "support": []} 
+                         for class_name in classes}
+        model_metrics['accuracy'] = []
+        model_metrics['macro avg'] = {"precision": [], "recall": [], "f1-score": [], "support": []}
+        model_metrics['weighted avg'] = {"precision": [], "recall": [], "f1-score": [], "support": []}
 
-    if N is not None:
-        for i in range(N):
-            print(f"Starting evaluation {i + 1} of {N}")
-            full_report = compute_metrics(test_loader=test_dataloader, model=model, 
-                                          model_name=f"{model_name}_{i + 1}", save_dir=model_dir, output_name=output_name)
+        if N is not None:
+            for i in range(N):
+                print(f"Starting evaluation {i + 1} of {N}")
+                full_report = compute_metrics(test_loader=test_dataloader, model=model, 
+                                              model_name=f"{model_name}_{i + 1}", save_dir=model_dir, output_name=output_name)
+                
+                # Append the metrics of this iteration to the respective lists
+                for class_name in classes:
+                    for metric in ["precision", "recall", "f1-score", "support"]:
+                        model_metrics[class_name][metric].append(float(full_report[class_name][metric]))
+                        
+                # Append accuracy, macro avg, and weighted avg
+                model_metrics['accuracy'].append(float(full_report['accuracy']))
+                for metric in ["precision", "recall", "f1-score", "support"]:
+                    model_metrics['macro avg'][metric].append(float(full_report['macro avg'][metric]))
+                    model_metrics['weighted avg'][metric].append(float(full_report['weighted avg'][metric]))
             
-            # Append the metrics of this iteration to the respective lists
+            # Compute the mean of the metrics across all iterations
             for class_name in classes:
                 for metric in ["precision", "recall", "f1-score", "support"]:
-                    model_metrics[class_name][metric].append(float(full_report[class_name][metric]))
-                    
-            # Append accuracy, macro avg, and weighted avg
-            model_metrics['accuracy'].append(float(full_report['accuracy']))
+                    model_metrics[class_name][metric] = float(np.mean(model_metrics[class_name][metric]))
+
+            # Compute the mean of accuracy, macro avg, and weighted avg
+            model_metrics['accuracy'] = float(np.mean(model_metrics['accuracy']))
             for metric in ["precision", "recall", "f1-score", "support"]:
-                model_metrics['macro avg'][metric].append(float(full_report['macro avg'][metric]))
-                model_metrics['weighted avg'][metric].append(float(full_report['weighted avg'][metric]))
-        
-        # Compute the mean of the metrics across all iterations
-        for class_name in classes:
-            for metric in ["precision", "recall", "f1-score", "support"]:
-                model_metrics[class_name][metric] = float(np.mean(model_metrics[class_name][metric]))
+                model_metrics['macro avg'][metric] = float(np.mean(model_metrics['macro avg'][metric]))
+                model_metrics['weighted avg'][metric] = float(np.mean(model_metrics['weighted avg'][metric]))
 
-        # Compute the mean of accuracy, macro avg, and weighted avg
-        model_metrics['accuracy'] = float(np.mean(model_metrics['accuracy']))
-        for metric in ["precision", "recall", "f1-score", "support"]:
-            model_metrics['macro avg'][metric] = float(np.mean(model_metrics['macro avg'][metric]))
-            model_metrics['weighted avg'][metric] = float(np.mean(model_metrics['weighted avg'][metric]))
+        else:
+            full_report = compute_metrics(test_loader=test_dataloader, model=model, 
+                                          model_name=model_name, save_dir=model_dir, 
+                                          output_name=f"{output_name}_{model_file_name}")
+            model_metrics = full_report
 
-    else:
-        full_report = compute_metrics(test_loader=test_dataloader, model=model, model_name=model_name, save_dir=model_dir, output_name=output_name)
-        model_metrics = full_report
+        print('Compiling Metrics')
+        output_file_name = f'{output_name}_{model_file_name}.yaml'
+        with open(os.path.join(model_dir, output_file_name), 'w') as file:
+            yaml.dump(model_metrics, file)
 
-    print('Compiling Metrics')
-    with open(f'{model_dir}/{output_name}.yaml', 'w') as file:
-        yaml.dump(model_metrics, file)
-
-    print(f'Metrics saved at {model_dir}/{output_name}.yaml')
+        print(f'Metrics saved at {os.path.join(model_dir, output_file_name)}')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Evaluate Galaxy10 models')

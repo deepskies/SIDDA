@@ -17,9 +17,9 @@ import random
 import geomloss
 
 def sinkhorn_loss(x, 
-                  y
+                  y,
             ):
-    loss = geomloss.SamplesLoss(loss='sinkhorn')
+    loss = geomloss.SamplesLoss(loss='sinkhorn', scaling=0.8)
     return loss(x, y)
 
 
@@ -258,7 +258,7 @@ def train_model_da(model,
             if val_acc > best_val_acc:
                 best_val_acc = val_acc
                 best_val_epoch = epoch + 1
-                model_path = os.path.join(save_dir, "best_val_acc_model.pt")
+                model_path = os.path.join(save_dir, "best_model_val_acc.pt")
                 if torch.cuda.device_count() > 1:
                     torch.save(model.eval().module.state_dict(), model_path)
                 else:
@@ -269,7 +269,7 @@ def train_model_da(model,
             if val_classification_loss < best_classification_loss:
                 best_classification_loss = val_classification_loss
                 best_classification_epoch = epoch + 1
-                model_path = os.path.join(save_dir, "lowest_classification_loss_model.pt")
+                model_path = os.path.join(save_dir, "best_model_classification_loss.pt")
                 if torch.cuda.device_count() > 1:
                     torch.save(model.eval().module.state_dict(), model_path)
                 else:
@@ -280,7 +280,7 @@ def train_model_da(model,
             if val_domain_loss < best_domain_loss:
                 best_domain_loss = val_domain_loss
                 best_domain_epoch = epoch + 1
-                model_path = os.path.join(save_dir, "lowest_domain_loss_model.pt")
+                model_path = os.path.join(save_dir, "best_model_domain_loss.pt")
                 if torch.cuda.device_count() > 1:
                     torch.save(model.eval().module.state_dict(), model_path)
                 else:
@@ -313,7 +313,7 @@ def train_model_da(model,
 
     # Plot Validation Losses
     plt.subplot(2, 1, 2)
-    plt.plot(steps, val_losses, label='Validation Total Loss')
+    plt.plot(steps // report_interval, val_losses, label='Validation Total Loss')
     plt.plot(steps, val_classification_losses, label='Validation Classification Loss')
     plt.plot(steps, val_domain_losses, label='Validation Domain Loss')
     plt.xlabel('Epochs')
@@ -335,26 +335,6 @@ def train_model_da(model,
     np.save(os.path.join(save_dir, f"steps-{model_name}.npy"), np.array(steps))
 
     return best_val_epoch, best_val_acc, losses[-1]
-
-# We don't need gradients during evaluation.
-@torch.no_grad()
-def evaluate(eval_loader: DataLoader, model: nn.Module):
-
-    accuracy = []
-
-    for batch in eval_loader:
-        inputs, labels = batch[0].to(device), batch[1].to(device)
-        outputs = model(inputs)
-        pred_labels = torch.argmax(outputs, dim=-1)
-        tmp = (labels == pred_labels).float().mean()
-        accuracy.append(tmp.item())
-
-    # We compute the mean of means over batches.
-    # This could be slightly skewed if the last batch is smaller.
-    # Does not matter too much here.
-    accuracy = np.mean(accuracy)
-    print("Correct answer in {:.1f}% of cases.".format(accuracy * 100))
-
 
 def main(config):
     model = d4_model()
