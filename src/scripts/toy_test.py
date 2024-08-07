@@ -28,9 +28,9 @@ def load_models(directory_path, model_name='D4'):
     
     models = []
     
-    # Search for files that contain 'best_model' in their names
+    # Search for files that contain 'best_model' and end with '.pt' in their names
     for file_name in os.listdir(directory_path):
-        if 'best_model' in file_name:
+        if 'best_model' in file_name and file_name.endswith('.pt'):
             file_path = os.path.join(directory_path, file_name)
             print(f'Loading {model_name} from {file_path}...')
             
@@ -38,11 +38,13 @@ def load_models(directory_path, model_name='D4'):
             model.eval()
             model.load_state_dict(torch.load(file_path, map_location=device))
             
-            models.append((model, file_name))
+            # Remove the .pt extension for output file naming
+            model_name_no_ext = file_name[:-3]
+            models.append((model, model_name_no_ext))
             print(f'Finished Loading {model_name} from {file_path}')
     
     if not models:
-        print(f"No models containing 'best_model' found in {directory_path}.")
+        print(f"No models containing 'best_model' ending with '.pt' found in {directory_path}.")
     
     return models
 
@@ -89,7 +91,6 @@ def compute_metrics(test_loader, model, model_name, save_dir, output_name):
     plt.close()
     
     return sklearn_report
-
 @torch.no_grad()
 def main(model_dir, output_name, x_test_path, y_test_path, N=None, adversarial_attack=False):
     if adversarial_attack:
@@ -162,8 +163,6 @@ def main(model_dir, output_name, x_test_path, y_test_path, N=None, adversarial_a
             yaml.dump(model_metrics, file)
 
         print(f'Metrics saved at {os.path.join(model_dir, output_file_name)}')
-        
-        del model
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Evaluate Galaxy10 models')
