@@ -53,7 +53,8 @@ def load_models(directory_path, model_name='D4'):
 @torch.no_grad()
 def compute_metrics(test_loader, model, model_name, save_dir, output_name):
     y_pred, y_true, feature_maps = [], [], []
-    model = nn.DataParallel(model)
+    if torch.cuda.device_count() > 1:
+        model = nn.DataParallel(model)
     model.to(device)
     model.eval()
 
@@ -72,12 +73,19 @@ def compute_metrics(test_loader, model, model_name, save_dir, output_name):
     feature_maps = np.asarray(feature_maps)
     flattened_features = feature_maps.reshape(feature_maps.shape[0], -1)
     
+    confusion_matrix_dir = os.path.join(save_dir, 'confusion_matrix')
+    if not os.path.exists(confusion_matrix_dir):
+        os.makedirs(confusion_matrix_dir)
+    isomap_dir = os.path.join(save_dir, 'isomap')
+    if not os.path.exists(isomap_dir):
+        os.makedirs(isomap_dir)
+    
     isomap = Isomap(n_components=2, n_neighbors=5)
     isomap_embedding = isomap.fit_transform(flattened_features)
     plt.scatter(isomap_embedding[:, 0], isomap_embedding[:, 1], c=y_pred, cmap='viridis')
     plt.colorbar()
-    plt.savefig(os.path.join(save_dir, f"isomap_{model_name}_{output_name}.png"), bbox_inches='tight')
-    np.save(f"{save_dir}/isomap_{model_name}_{output_name}.npy", isomap_embedding)
+    plt.savefig(os.path.join(isomap_dir, f"isomap_{model_name}_{output_name}.png"), bbox_inches='tight')
+    np.save(f"{isomap_dir}/isomap_{model_name}_{output_name}.npy", isomap_embedding)
     plt.close()
   
     sklearn_report = classification_report(y_true, y_pred, output_dict=True, target_names=classes)
@@ -87,12 +95,17 @@ def compute_metrics(test_loader, model, model_name, save_dir, output_name):
     plt.figure(figsize=(12, 7))
     sn.heatmap(df_cm, annot=True)
     plt.title(f'{model_name} Confusion Matrix')
-    plt.savefig(os.path.join(save_dir, f"confusion_matrix_{model_name}_{output_name}.png"), bbox_inches='tight')
+    plt.savefig(os.path.join(confusion_matrix_dir, f"confusion_matrix_{model_name}_{output_name}.png"), bbox_inches='tight')
     plt.close()
     
     return sklearn_report
 @torch.no_grad()
 def main(model_dir, output_name, x_test_path, y_test_path, N=None, adversarial_attack=False):
+    
+    metrics_dir = os.path.join(model_dir, 'metrics')
+    if not os.path.exists(metrics_dir):
+        os.makedirs(metrics_dir)
+        
     if adversarial_attack:
         transform = transforms.Compose([
             transforms.ToTensor(),
@@ -159,7 +172,7 @@ def main(model_dir, output_name, x_test_path, y_test_path, N=None, adversarial_a
 
         print('Compiling Metrics')
         output_file_name = f'{output_name}_{model_file_name}.yaml'
-        with open(os.path.join(model_dir, output_file_name), 'w') as file:
+        with open(os.path.join(metrics_dir, output_file_name), 'w') as file:
             yaml.dump(model_metrics, file)
 
         print(f'Metrics saved at {os.path.join(model_dir, output_file_name)}')
