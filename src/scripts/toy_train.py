@@ -161,15 +161,18 @@ def train_model_da(model,
         model.to(device)
     
     print("Model Loaded to Device!")
-    best_val_acc, no_improvement_count = 0, 0
+    best_val_acc, best_classification_loss, best_domain_loss = 0, float('inf'), float('inf')
+    no_improvement_count = 0
     losses, steps = [], []
+    train_classification_losses, train_domain_losses = [], []
+    val_losses, val_classification_losses, val_domain_losses = [], []
+    
     print("Training Started!")
+    
     for epoch in range(epochs):
         model.train()
         train_loss = 0.0
-        
-        classification_losses = []
-        domain_losses = []
+        classification_losses, domain_losses = []
         
         for i, (batch, target_batch) in tqdm(enumerate(zip(train_dataloader, target_dataloader))):
             inputs, targets = batch
@@ -181,28 +184,29 @@ def train_model_da(model,
             features, outputs = model(inputs)
             target_features, _ = model(target_inputs)
             
-            features = features.view(features.size(0), -1)
-            target_features = target_features.view(target_features.size(0), -1)
-            
-            classification_loss = F.cross_entropy(outputs, targets)
+            classificaiton_loss = F.cross_entropy(outputs, targets)
             domain_loss = sinkhorn_loss(features, target_features)            
-            loss = classification_loss + scale_factor * domain_loss
+            loss = classificaiton_loss + scale_factor * domain_loss
             
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
             train_loss += loss.item()
-            losses.append(loss.item())
-            classification_losses.append(classification_loss.item())
+            classification_losses.append(classificaiton_loss.item())
             domain_losses.append(domain_loss.item())
-            steps.append(epoch * len(train_dataloader) + i + 1)
 
         train_loss /= len(train_dataloader)
-        classification_loss = np.mean(classification_losses)
-        domain_loss = np.mean(domain_losses)
+        train_classification_loss = np.mean(classification_losses)
+        train_domain_loss = np.mean(domain_losses)
+        
+        losses.append(train_loss)
+        train_classification_losses.append(train_classification_loss)
+        train_domain_losses.append(train_domain_loss)
+        steps.append(epoch + 1)
+        
         print(f"Epoch: {epoch + 1}, Train Loss: {train_loss:.4e}")
-        print(f"Epoch: {epoch + 1}, Classification Loss: {classification_loss:.4e}, Domain Loss: {domain_loss:.4e}")
+        print(f"Epoch: {epoch + 1}, Classification Loss: {train_classification_loss:.4e}, Domain Loss: {train_domain_loss:.4e}")
 
         if scheduler is not None:
             scheduler.step()
@@ -210,7 +214,7 @@ def train_model_da(model,
         if (epoch + 1) % report_interval == 0:
             model.eval()
             correct, total, val_loss = 0, 0, 0.0
-            domain_loss, classification_loss = 0.0, 0.0
+            val_classification_loss, val_domain_loss = 0.0, 0.0
 
             with torch.no_grad():
                 for i, (batch, target_batch) in enumerate(zip(val_dataloader, target_val_dataloader)):
@@ -220,15 +224,14 @@ def train_model_da(model,
                     target_inputs = target_inputs.to(device).float()
                     features, outputs = model(inputs)
                     target_features, _ = model(target_inputs)
-                    features = features.view(features.size(0), -1)
-                    target_features = target_features.view(target_features.size(0), -1)
+                    
                     classification_loss_ = F.cross_entropy(outputs, targets)
                     domain_loss_ = sinkhorn_loss(features, target_features)
                     combined_loss = classification_loss_ + scale_factor * domain_loss_
-                    val_loss += combined_loss.item()
-                    domain_loss += domain_loss_.item()
-                    classification_loss += classification_loss_.item()
                     
+                    val_loss += combined_loss.item()
+                    val_classification_loss += classification_loss_.item()
+                    val_domain_loss += domain_loss_.item()
                     
                     _, predicted = torch.max(outputs.data, 1)
                     total += targets.size(0)
@@ -236,41 +239,97 @@ def train_model_da(model,
 
             val_acc = 100 * correct / total
             val_loss /= len(val_dataloader)
+            val_classification_loss /= len(val_dataloader)
+            val_domain_loss /= len(val_dataloader)
+            val_losses.append(val_loss)
+            val_classification_losses.append(val_classification_loss)
+            val_domain_losses.append(val_domain_loss)
+            
             lr = scheduler.get_last_lr()[0] if scheduler is not None else optimizer.param_groups[0]['lr']
             print(f"Epoch: {epoch + 1}, Validation Loss: {val_loss:.4f}, Accuracy: {val_acc:.2f}%, Learning rate: {lr}")
-            print(f"Epoch: {epoch + 1}, Classification Loss: {classification_loss:.4e}, Domain Loss: {domain_loss:.4e}")
+            print(f"Epoch: {epoch + 1}, Classification Loss: {val_classification_loss:.4e}, Domain Loss: {val_domain_loss:.4e}")
 
+            # Check and save the model with best validation accuracy
             if val_acc > best_val_acc:
                 best_val_acc = val_acc
-                no_improvement_count = 0
                 best_val_epoch = epoch + 1
+                model_path = os.path.join(save_dir, "best_val_acc_model.pt")
                 if torch.cuda.device_count() > 1:
-                    torch.save(model.eval().module.state_dict(), os.path.join(save_dir, "best_model_DA.pt"))
+                    torch.save(model.eval().module.state_dict(), model_path)
                 else:
-                    torch.save(model.eval().state_dict(), os.path.join(save_dir, "best_model_DA.pt"))
-            else:
-                no_improvement_count += 1
+                    torch.save(model.eval().state_dict(), model_path)
+                print(f"Saved best validation accuracy model at epoch {best_val_epoch}")
+
+            # Check and save the model with lowest classification loss
+            if val_classification_loss < best_classification_loss:
+                best_classification_loss = val_classification_loss
+                best_classification_epoch = epoch + 1
+                model_path = os.path.join(save_dir, "lowest_classification_loss_model.pt")
+                if torch.cuda.device_count() > 1:
+                    torch.save(model.eval().module.state_dict(), model_path)
+                else:
+                    torch.save(model.eval().state_dict(), model_path)
+                print(f"Saved lowest classification loss model at epoch {best_classification_epoch}")
+
+            # Check and save the model with lowest domain loss
+            if val_domain_loss < best_domain_loss:
+                best_domain_loss = val_domain_loss
+                best_domain_epoch = epoch + 1
+                model_path = os.path.join(save_dir, "lowest_domain_loss_model.pt")
+                if torch.cuda.device_count() > 1:
+                    torch.save(model.eval().module.state_dict(), model_path)
+                else:
+                    torch.save(model.eval().state_dict(), model_path)
+                print(f"Saved lowest domain loss model at epoch {best_domain_epoch}")
+
 
             if no_improvement_count >= early_stopping_patience:
-                print(f"Early stopping after {early_stopping_patience} epochs without improvement.")
+                print(f"Early stopping after {early_stopping_patience} epochs without improvement in accuracy.")
                 break
+            
+        return best_val_epoch, best_val_acc, losses[-1]
     
+    # Save final model
     if torch.cuda.device_count() > 1:
-        torch.save(model.eval().module.state_dict(), os.path.join(save_dir, "final_model_DA.pt"))
+        torch.save(model.eval().module.state_dict(), os.path.join(save_dir, "final_model.pt"))
     else:
-        torch.save(model.eval().state_dict(), os.path.join(save_dir, "final_model_DA.pt"))
-    np.save(os.path.join(save_dir, f"losses-{model_name}.npy"), np.array(losses))
-    np.save(os.path.join(save_dir, f"steps-{model_name}.npy"), np.array(steps))
+        torch.save(model.eval().state_dict(), os.path.join(save_dir, "final_model.pt"))
 
-    # Plot loss vs. training step graph
-    plt.figure(figsize=(10, 5))
-    plt.plot(steps, losses)
-    plt.xlabel('Training Steps')
-    plt.ylabel('Loss')
-    plt.title('Loss vs. Training Steps')
-    plt.savefig(os.path.join(save_dir, "loss_vs_training_steps.png"), bbox_inches='tight')
+    # Plotting the losses
+    plt.figure(figsize=(14, 8))
     
-    return best_val_epoch, best_val_acc, losses[-1]
+    # Plot Training Losses
+    plt.subplot(2, 1, 1)
+    plt.plot(steps, losses, label='Train Total Loss')
+    plt.plot(steps, train_classification_losses, label='Train Classification Loss')
+    plt.plot(steps, train_domain_losses, label='Train Domain Loss')
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+    plt.title('Training Losses')
+    plt.legend()
+
+    # Plot Validation Losses
+    plt.subplot(2, 1, 2)
+    plt.plot(steps, val_losses, label='Validation Total Loss')
+    plt.plot(steps, val_classification_losses, label='Validation Classification Loss')
+    plt.plot(steps, val_domain_losses, label='Validation Domain Loss')
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+    plt.title('Validation Losses')
+    plt.legend()
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(save_dir, f"losses_plot-{model_name}.png"))
+    plt.show()
+    
+    # Saving losses and steps
+    np.save(os.path.join(save_dir, f"losses-{model_name}.npy"), np.array(losses))
+    np.save(os.path.join(save_dir, f"train_classification_losses-{model_name}.npy"), np.array(train_classification_losses))
+    np.save(os.path.join(save_dir, f"train_domain_losses-{model_name}.npy"), np.array(train_domain_losses))
+    np.save(os.path.join(save_dir, f"val_losses-{model_name}.npy"), np.array(val_losses))
+    np.save(os.path.join(save_dir, f"val_classification_losses-{model_name}.npy"), np.array(val_classification_losses))
+    np.save(os.path.join(save_dir, f"val_domain_losses-{model_name}.npy"), np.array(val_domain_losses))
+    np.save(os.path.join(save_dir, f"steps-{model_name}.npy"), np.array(steps))
 
 
 # We don't need gradients during evaluation.

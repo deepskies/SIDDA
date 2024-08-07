@@ -22,21 +22,24 @@ classes = (
     'lines', 'rectangles', 'circles'
 )
 
-# Assuming model_dict is already defined and contains 'D4'
+
 def load_model(directory_path, model_name='D4'):
-    device = ('cuda' if torch.cuda.is_available() else 'cpu')
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
     model = None
-    file_path = os.path.join(directory_path, 'best_model.pt')
     
-    if os.path.isfile(file_path):
-        print(f'Loading {model_name}...')
-        model = d4_model()
-        model.eval()
-        model.load_state_dict(torch.load(file_path, map_location=device))
-        print(f'Finished Loading {model_name}')
-    
-    return model
+    # Search for a file that contains 'best_model' in its name
+    for file_name in os.listdir(directory_path):
+        if 'best_model' in file_name:
+            file_path = os.path.join(directory_path, file_name)
+            print(f'Loading {model_name} from {file_path}...')
+            
+            model = d4_model()
+            model.eval()
+            model.load_state_dict(torch.load(file_path, map_location=device))
+            
+            print(f'Finished Loading {model_name}')
+            break
 
 
 @torch.no_grad()
