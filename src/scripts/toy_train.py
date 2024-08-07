@@ -4,10 +4,7 @@ import yaml
 import numpy as np
 import matplotlib.pyplot as plt
 import time
-from sklearn.metrics import confusion_matrix
-from torch.utils.data import DataLoader, random_split, Subset
-import seaborn as sn
-import pandas as pd
+from torch.utils.data import DataLoader, random_split
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -20,14 +17,9 @@ import random
 import geomloss
 
 def sinkhorn_loss(x, 
-                  y, 
-                  p=2, 
-                  blur=0.05,
-                  scaling=0.9, 
-                  max_iter=100, 
-                  reach=4
+                  y
             ):
-    loss = geomloss.SamplesLoss(loss='sinkhorn', p=p, blur=blur, scaling=scaling, reach=reach, max_iter=max_iter)
+    loss = geomloss.SamplesLoss(loss='sinkhorn')
     return loss(x, y)
 
 
