@@ -325,8 +325,8 @@ def main(config):
     ])
 
     # Function to split dataset into train and validation subsets
-    def split_dataset(dataset, test_size, train_transform, val_transform):
-        val_size = int(len(dataset) * test_size)
+    def split_dataset(dataset, val_size, train_transform, val_transform):
+        val_size = int(len(dataset) * val_size)
         train_size = len(dataset) - val_size
         
         train_subset, val_subset = random_split(dataset, [train_size, val_size])
@@ -347,7 +347,7 @@ def main(config):
 
     # Split source dataset into train and validation sets
     train_dataset, val_dataset = split_dataset(train_dataset, 
-                                            test_size=config['parameters']['test_size'], 
+                                            val_size=config['parameters']['val_size'],
                                             train_transform=train_transform, 
                                             val_transform=val_transform)
 
@@ -359,7 +359,7 @@ def main(config):
         
         # Split target dataset into train and validation sets
         target_dataset, val_target_dataset = split_dataset(target_dataset, 
-                                                        test_size=config['parameters']['test_size'], 
+                                                        val_size=config['parameters']['val_size'], 
                                                         train_transform=train_transform, 
                                                         val_transform=val_transform)
 
