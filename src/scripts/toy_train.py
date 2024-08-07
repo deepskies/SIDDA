@@ -217,6 +217,7 @@ def train_model_da(model,
                     inputs, targets = batch
                     inputs, targets = inputs.to(device).float(), targets.to(device)
                     target_inputs, _ = target_batch
+                    target_inputs = target_inputs.to(device).float()
                     features, outputs = model(inputs)
                     target_features, _ = model(target_inputs)
                     features = features.view(features.size(0), -1)
