@@ -165,14 +165,14 @@ def train_model_da(model,
     no_improvement_count = 0
     losses, steps = [], []
     train_classification_losses, train_domain_losses = [], []
-    val_losses, val_classification_losses, val_domain_losses = [], []
+    val_losses, val_classification_losses, val_domain_losses = [], [], []
     
     print("Training Started!")
     
     for epoch in range(epochs):
         model.train()
         train_loss = 0.0
-        classification_losses, domain_losses = []
+        classification_losses, domain_losses = [], []
         
         for i, (batch, target_batch) in tqdm(enumerate(zip(train_dataloader, target_dataloader))):
             inputs, targets = batch
@@ -183,6 +183,9 @@ def train_model_da(model,
             
             features, outputs = model(inputs)
             target_features, _ = model(target_inputs)
+            
+            features = features.view(features.size(0), -1)
+            target_features = target_features.view(target_features.size(0), -1)
             
             classificaiton_loss = F.cross_entropy(outputs, targets)
             domain_loss = sinkhorn_loss(features, target_features)            
@@ -224,6 +227,8 @@ def train_model_da(model,
                     target_inputs = target_inputs.to(device).float()
                     features, outputs = model(inputs)
                     target_features, _ = model(target_inputs)
+                    features = features.view(features.size(0), -1)
+                    target_features = target_features.view(target_features.size(0), -1)
                     
                     classification_loss_ = F.cross_entropy(outputs, targets)
                     domain_loss_ = sinkhorn_loss(features, target_features)
