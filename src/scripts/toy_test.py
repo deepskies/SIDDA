@@ -76,6 +76,7 @@ def compute_metrics(test_loader, model, model_name, save_dir, output_name):
     plt.colorbar()
     plt.savefig(os.path.join(save_dir, f"isomap_{model_name}_{output_name}.png"), bbox_inches='tight')
     np.save(f"{save_dir}/isomap_{model_name}_{output_name}.npy", isomap_embedding)
+    plt.close()
   
     sklearn_report = classification_report(y_true, y_pred, output_dict=True, target_names=classes)
 
@@ -161,6 +162,8 @@ def main(model_dir, output_name, x_test_path, y_test_path, N=None, adversarial_a
             yaml.dump(model_metrics, file)
 
         print(f'Metrics saved at {os.path.join(model_dir, output_file_name)}')
+        
+        del model
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Evaluate Galaxy10 models')
