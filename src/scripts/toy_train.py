@@ -184,9 +184,9 @@ def train_model_da(model,
             features = features.view(features.size(0), -1)
             target_features = target_features.view(target_features.size(0), -1)
             
-            classificaiton_loss = F.cross_entropy(outputs, targets)
+            classification_loss = F.cross_entropy(outputs, targets)
             domain_loss = sinkhorn_loss(features, target_features)            
-            loss = classificaiton_loss + scale_factor * domain_loss
+            loss = classification_loss + scale_factor * domain_loss
             
             optimizer.zero_grad()
             loss.backward()
@@ -194,7 +194,7 @@ def train_model_da(model,
 
             train_loss += loss.item()
             losses.append(loss.item())
-            classification_losses.append(classificaiton_loss.item())
+            classification_losses.append(classification_loss.item())
             domain_losses.append(domain_loss.item())
             steps.append(epoch * len(train_dataloader) + i + 1)
 
@@ -377,13 +377,14 @@ def main(config):
     if config['DA']:
         save_dir = config['save_dir'] + config['model'] + '_DA_' + timestr
         best_val_epoch, best_val_acc, final_loss = train_model_da(model, 
-                                                           train_dataloader, 
-                                                           val_dataloader, 
-                                                           target_dataloader,
-                                                           target_val_dataloader,
-                                                           optimizer, 
-                                                           model_name, 
-                                                           scheduler, 
+                                                           train_dataloader=train_dataloader, 
+                                                           val_dataloader=val_dataloader, 
+                                                           target_dataloader=target_dataloader,
+                                                           target_val_dataloader=target_val_dataloader,
+                                                           scale_factor=config['parameters']['scale_factor'],
+                                                           optimizer=optimizer, 
+                                                           model_name=model_name, 
+                                                           scheduler=scheduler, 
                                                            epochs=config['parameters']['epochs'], 
                                                            device=device, 
                                                            save_dir=save_dir,
@@ -394,12 +395,12 @@ def main(config):
         
     else:
         save_dir = config['save_dir'] + config['model'] + '_' + timestr
-        best_val_epoch, best_val_acc, final_loss = train_model(model, 
-                                                           train_dataloader, 
-                                                           val_dataloader,
-                                                           optimizer, 
-                                                           model_name, 
-                                                           scheduler, 
+        best_val_epoch, best_val_acc, final_loss = train_model(model=model, 
+                                                           train_dataloader=train_dataloader, 
+                                                           val_dataloader=val_dataloader,
+                                                           optimizer=optimizer, 
+                                                           model_name=model_name, 
+                                                           scheduler=scheduler, 
                                                            epochs=config['parameters']['epochs'], 
                                                            device=device, 
                                                            save_dir=save_dir,
