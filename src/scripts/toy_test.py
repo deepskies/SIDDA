@@ -62,7 +62,7 @@ def compute_metrics(test_loader, model, model_name, save_dir, output_name):
     flattened_features = feature_maps.reshape(feature_maps.shape[0], -1)
     
     isomap = Isomap(n_components=2, n_neighbors=5)
-    isomap_embedding = isomap.fit_transform(flattened_features.detach().cpu().numpy())
+    isomap_embedding = isomap.fit_transform(flattened_features)
     plt.scatter(isomap_embedding[:, 0], isomap_embedding[:, 1], c=y_pred, cmap='viridis')
     plt.colorbar()
     plt.savefig(os.path.join(save_dir, f"isomap_{model_name}_{output_name}.png"), bbox_inches='tight')
