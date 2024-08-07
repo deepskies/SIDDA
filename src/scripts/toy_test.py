@@ -66,6 +66,7 @@ def compute_metrics(test_loader, model, model_name, save_dir, output_name):
     plt.scatter(isomap_embedding[:, 0], isomap_embedding[:, 1], c=y_pred, cmap='viridis')
     plt.colorbar()
     plt.savefig(os.path.join(save_dir, f"isomap_{model_name}_{output_name}.png"), bbox_inches='tight')
+    np.save(f"{save_dir}/isomap_{model_name}_{output_name}.npy", isomap_embedding)
   
     sklearn_report = classification_report(y_true, y_pred, output_dict=True, target_names=classes)
 

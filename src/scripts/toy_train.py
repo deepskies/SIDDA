@@ -5,10 +5,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import time
 from sklearn.metrics import confusion_matrix
+from torch.utils.data import DataLoader, random_split, Subset
 import seaborn as sn
 import pandas as pd
 import torch
-from torch.utils.data import DataLoader
 from torch import nn
 from torch.nn import functional as F
 from torch import optim
@@ -17,20 +17,18 @@ from toy_models import d4_model, feature_fields
 from toy_dataset import Shapes
 from tqdm import tqdm
 import random
-import copy
-# import ot
-# import geomloss
+import geomloss
 
-# def sinkhorn_loss(x, 
-#                   y, 
-#                   p=2, 
-#                   blur=0.05,
-#                   scaling=0.9, 
-#                   max_iter=100, 
-#                   reach=4
-#             ):
-#     loss = geomloss.SamplesLoss(loss='sinkhorn', p=p, blur=blur, scaling=scaling, reach=reach, max_iter=max_iter)
-#     return loss(x, y)
+def sinkhorn_loss(x, 
+                  y, 
+                  p=2, 
+                  blur=0.05,
+                  scaling=0.9, 
+                  max_iter=100, 
+                  reach=4
+            ):
+    loss = geomloss.SamplesLoss(loss='sinkhorn', p=p, blur=blur, scaling=scaling, reach=reach, max_iter=max_iter)
+    return loss(x, y)
 
 
 def set_all_seeds(num):
@@ -76,11 +74,8 @@ def train_model(model,
             inputs = inputs.float()
 
             optimizer.zero_grad()
-            features, outputs = model(inputs)
+            _, outputs = model(inputs)
             loss = F.cross_entropy(outputs, targets)
-            
-            # if config['OT']:
-            #     loss = sinkhorn_loss(outputs, targets)
             loss.backward()
             optimizer.step()
 
@@ -103,7 +98,7 @@ def train_model(model,
                     inputs, targets = batch
                     inputs, targets = inputs.to(device), targets.to(device)
                     inputs = inputs.float()
-                    features, outputs = model(inputs)
+                    _, outputs = model(inputs)
                     loss = F.cross_entropy(outputs, targets)
                     val_loss += loss.item()
                     _, predicted = torch.max(outputs.data, 1)
@@ -148,6 +143,138 @@ def train_model(model,
     return best_val_epoch, best_val_acc, losses[-1]
 
 
+def train_model_da(model, 
+                train_dataloader, 
+                val_dataloader, 
+                target_dataloader,
+                target_val_dataloader,
+                scale_factor,
+                optimizer, 
+                model_name, 
+                scheduler = None, 
+                epochs=100, 
+                device='cuda', 
+                save_dir='checkpoints', 
+                early_stopping_patience=10, 
+                report_interval=5
+            ):
+    
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+
+    if torch.cuda.device_count() > 1:
+        model = nn.DataParallel(model)
+        model.to(device)
+    else:
+        model.to(device)
+    
+    print("Model Loaded to Device!")
+    best_val_acc, no_improvement_count = 0, 0
+    losses, steps = [], []
+    print("Training Started!")
+    for epoch in range(epochs):
+        model.train()
+        train_loss = 0.0
+        
+        classification_losses = []
+        domain_losses = []
+        
+        for i, (batch, target_batch) in tqdm(enumerate(zip(train_dataloader, target_dataloader))):
+            inputs, targets = batch
+            inputs, targets = inputs.to(device).float(), targets.to(device)
+            
+            target_inputs, _ = target_batch
+            target_inputs = target_inputs.to(device).float()
+            
+            features, outputs = model(inputs)
+            target_features, _ = model(target_inputs)
+            
+            classificaiton_loss = F.cross_entropy(outputs, targets)
+            domain_loss = sinkhorn_loss(features, target_features)            
+            loss = classificaiton_loss + scale_factor * domain_loss
+            
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            train_loss += loss.item()
+            losses.append(loss.item())
+            classification_losses.append(classificaiton_loss.item())
+            domain_losses.append(domain_loss.item())
+            steps.append(epoch * len(train_dataloader) + i + 1)
+
+        train_loss /= len(train_dataloader)
+        classification_loss = np.mean(classification_losses)
+        domain_loss = np.mean(domain_losses)
+        print(f"Epoch: {epoch + 1}, Train Loss: {train_loss:.4e}")
+        print(f"Epoch: {epoch + 1}, Classification Loss: {classification_loss:.4e}, Domain Loss: {domain_loss:.4e}")
+
+        if scheduler is not None:
+            scheduler.step()
+
+        if (epoch + 1) % report_interval == 0:
+            model.eval()
+            correct, total, val_loss = 0, 0, 0.0
+            domain_loss, classification_loss = 0.0, 0.0
+
+            with torch.no_grad():
+                for i, (batch, target_batch) in enumerate(zip(val_dataloader, target_val_dataloader)):
+                    inputs, targets = batch
+                    inputs, targets = inputs.to(device).float(), targets.to(device)
+                    target_inputs, _ = target_batch
+                    features, outputs = model(inputs)
+                    target_features, _ = model(target_inputs)
+                    classification_loss_ = F.cross_entropy(outputs, targets)
+                    domain_loss_ = sinkhorn_loss(features, target_features)
+                    combined_loss = classification_loss_ + scale_factor * domain_loss_
+                    val_loss += combined_loss.item()
+                    domain_loss += domain_loss_.item()
+                    classification_loss += classification_loss_.item()
+                    
+                    
+                    _, predicted = torch.max(outputs.data, 1)
+                    total += targets.size(0)
+                    correct += (predicted == targets).sum().item()
+
+            val_acc = 100 * correct / total
+            val_loss /= len(val_dataloader)
+            lr = scheduler.get_last_lr()[0] if scheduler is not None else optimizer.param_groups[0]['lr']
+            print(f"Epoch: {epoch + 1}, Validation Loss: {val_loss:.4f}, Accuracy: {val_acc:.2f}%, Learning rate: {lr}")
+            print(f"Epoch: {epoch + 1}, Classification Loss: {classification_loss:.4e}, Domain Loss: {domain_loss:.4e}")
+
+            if val_acc > best_val_acc:
+                best_val_acc = val_acc
+                no_improvement_count = 0
+                best_val_epoch = epoch + 1
+                if torch.cuda.device_count() > 1:
+                    torch.save(model.eval().module.state_dict(), os.path.join(save_dir, "best_model_DA.pt"))
+                else:
+                    torch.save(model.eval().state_dict(), os.path.join(save_dir, "best_model_DA.pt"))
+            else:
+                no_improvement_count += 1
+
+            if no_improvement_count >= early_stopping_patience:
+                print(f"Early stopping after {early_stopping_patience} epochs without improvement.")
+                break
+    
+    if torch.cuda.device_count() > 1:
+        torch.save(model.eval().module.state_dict(), os.path.join(save_dir, "final_model_DA.pt"))
+    else:
+        torch.save(model.eval().state_dict(), os.path.join(save_dir, "final_model_DA.pt"))
+    np.save(os.path.join(save_dir, f"losses-{model_name}.npy"), np.array(losses))
+    np.save(os.path.join(save_dir, f"steps-{model_name}.npy"), np.array(steps))
+
+    # Plot loss vs. training step graph
+    plt.figure(figsize=(10, 5))
+    plt.plot(steps, losses)
+    plt.xlabel('Training Steps')
+    plt.ylabel('Loss')
+    plt.title('Loss vs. Training Steps')
+    plt.savefig(os.path.join(save_dir, "loss_vs_training_steps.png"), bbox_inches='tight')
+    
+    return best_val_epoch, best_val_acc, losses[-1]
+
+
 # We don't need gradients during evaluation.
 @torch.no_grad()
 def evaluate(eval_loader: DataLoader, model: nn.Module):
@@ -166,61 +293,7 @@ def evaluate(eval_loader: DataLoader, model: nn.Module):
     # Does not matter too much here.
     accuracy = np.mean(accuracy)
     print("Correct answer in {:.1f}% of cases.".format(accuracy * 100))
-    
-@torch.no_grad()
-def plot_confusion_matrix(data_loader: DataLoader, save_dir: str, model: nn.Module):
-    '''
-    Plot confusion matrix for the model
-    '''
-    best_model = model
-    best_model_path = f'{save_dir}/best_model.pt'
-    
-    best_model.load_state_dict(torch.load(best_model_path, map_location = device))
-    best_model.to(device)
-    y_pred = []
-    y_true = []
 
-    for batch in data_loader:
-            inputs, labels = batch[0].to(device), batch[1].to(device)
-            output = best_model(inputs) # Feed Network
-            pred_labels = torch.argmax(output, dim=-1).cpu().numpy()
-            y_pred.extend(pred_labels) # Save Prediction
-            y_true.extend(labels.cpu().numpy())
-    
-    classes = ('Disturbed Galaxies', 'Merging Galaxies', 
-               'Round Smooth Galaxies', 'In-between Round Smooth Galaxies', 
-               'Cigar Shaped Smooth Galaxies', 'Barred Spiral Galaxies', 
-               'Unbarred Tight Spiral Galaxies', 'Unbarred Loose Spiral Galaxies', 
-               'Edge-on Galaxies without Bulge', 'Edge-on Galaxies with Bulge')
-    
-    y_true, y_pred = np.asarray(y_true), np.asarray(y_pred)
-    cf_matrix = confusion_matrix(y_true, y_pred)
-    df_cm = pd.DataFrame(cf_matrix / np.sum(cf_matrix, axis=1)[:, None], index = [i for i in classes],
-                     columns = [i for i in classes])
-    plt.figure(figsize = (12,7))
-    sn.heatmap(df_cm, annot=True)
-    plt.title(f'Confusion Matrix')
-    plt.savefig(os.path.join(save_dir, "confusion_matrix.png"), bbox_inches='tight')
-
-
-@torch.no_grad()
-def plot_predictions(eval_loader: DataLoader, model: nn.Module):
-    '''
-    Plot predictions for the model
-    '''
-    example = next(iter(eval_loader))
-    inputs = example[0].to(device)
-    outputs = model(inputs)
-    pred_labels = torch.argmax(outputs, dim=-1).to("cpu").numpy()
-
-    plt.figure(figsize=(10, 10))
-    for i in range(5*5):
-        plt.subplot(5, 5, 1 + i)
-        plt.title("Label: {:d}".format(pred_labels[i]))
-        plt.imshow(example[0][i][0])
-        plt.axis("off")
-        plt.savefig('../../plots/eval_saved.png')
-        
 
 def main(config):
     model = d4_model()
@@ -235,7 +308,8 @@ def main(config):
                                                milestones = config['parameters']['milestones'],
                                                gamma=config['parameters']['lr_decay']
                                             )
-    
+        
+    # Define transformations
     train_transform = transforms.Compose([
         transforms.ToTensor(),
         transforms.RandomRotation(180),
@@ -245,42 +319,71 @@ def main(config):
         transforms.RandomVerticalFlip(p=0.3),
         transforms.Normalize(mean=(0.5, ), std=(0.5,))
     ])
-    
+
     val_transform = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize(mean=(0.5, ), std=(0.5,)),
         transforms.Resize(100)
     ])
-    
-    print("Loading train dataset!")
-    start = time.time()
-    train_dataset = Shapes(input_path=config['train_data']['input_path'], output_path=config['train_data']['output_path'], transform=train_transform)
-    val_dataset = copy.deepcopy(train_dataset)
 
-    indices = torch.randperm(len(train_dataset))
-    val_size = int(len(train_dataset) * config['parameters']['test_size'])
-    train_dataset = torch.utils.data.Subset(train_dataset, indices[:-val_size])
-    val_dataset = torch.utils.data.Subset(val_dataset, indices[-val_size:])
-    assert len(train_dataset) + len(val_dataset) == len(indices)
-    train_dataset.dataset.transform = train_transform
-    val_dataset.dataset.transform = val_transform
+    # Function to split dataset into train and validation subsets
+    def split_dataset(dataset, test_size, train_transform, val_transform):
+        val_size = int(len(dataset) * test_size)
+        train_size = len(dataset) - val_size
+        
+        train_subset, val_subset = random_split(dataset, [train_size, val_size])
+        
+        # Apply transforms
+        train_subset.dataset.transform = train_transform
+        val_subset.dataset.transform = val_transform
+        
+        return train_subset, val_subset
+
+    print("Loading datasets!")
+    start = time.time()
+
+    # Load source dataset
+    train_dataset = Shapes(input_path=config['train_data']['input_path'], 
+                        output_path=config['train_data']['output_path'], 
+                        transform=train_transform)
+
+    # Split source dataset into train and validation sets
+    train_dataset, val_dataset = split_dataset(train_dataset, 
+                                            test_size=config['parameters']['test_size'], 
+                                            train_transform=train_transform, 
+                                            val_transform=val_transform)
+
+    if config['DA']:
+        # Load target dataset
+        target_dataset = Shapes(input_path=config['DA']['input_path'], 
+                                output_path=config['DA']['output_path'], 
+                                transform=val_transform)
+        
+        # Split target dataset into train and validation sets
+        target_dataset, val_target_dataset = split_dataset(target_dataset, 
+                                                        test_size=config['parameters']['test_size'], 
+                                                        train_transform=train_transform, 
+                                                        val_transform=val_transform)
+
     end = time.time()
-    print(f"dataset loaded in {end - start} s")
-    
-    test_len = int(config['parameters']['test_size'] * len(train_dataset))
-    train_len = len(train_dataset) - test_len
-    train_dataset, val_dataset = torch.utils.data.random_split(train_dataset, [train_len, test_len])
-    train_dataset.dataset.transform = train_transform
-    val_dataset.dataset.transform = val_transform
-    
+    print(f"Datasets loaded and split in {end - start} seconds")
+
+    # Dataloaders can be created if needed
     train_dataloader = DataLoader(train_dataset, batch_size=config['parameters']['batch_size'], shuffle=True, pin_memory=True)
-    val_dataloader = DataLoader(val_dataset, batch_size=config['parameters']['batch_size'], shuffle=True, pin_memory=True)
+    val_dataloader = DataLoader(val_dataset, batch_size=config['parameters']['batch_size'], shuffle=False, pin_memory=True)
+    if config['DA']:
+        target_dataloader = DataLoader(target_dataset, batch_size=config['parameters']['batch_size'], shuffle=True, pin_memory=True)
+        target_val_dataloader = DataLoader(val_target_dataset, batch_size=config['parameters']['batch_size'], shuffle=False, pin_memory=True)
 
     timestr = time.strftime("%Y%m%d-%H%M%S")
-    save_dir = config['save_dir'] + config['model'] + '_' + timestr
-    best_val_epoch, best_val_acc, final_loss = train_model(model, 
+    
+    if config['DA']:
+        save_dir = config['save_dir'] + config['model'] + '_DA_' + timestr
+        best_val_epoch, best_val_acc, final_loss = train_model_da(model, 
                                                            train_dataloader, 
                                                            val_dataloader, 
+                                                           target_dataloader,
+                                                           target_val_dataloader,
                                                            optimizer, 
                                                            model_name, 
                                                            scheduler, 
@@ -288,10 +391,26 @@ def main(config):
                                                            device=device, 
                                                            save_dir=save_dir,
                                                            early_stopping_patience=config['parameters']['early_stopping'], 
-                                                           report_interval=config['parameters']['report_interval']
+                                                           report_interval=config['parameters']['report_interval'],
+                                                    
+                                                        )
+        
+    else:
+        save_dir = config['save_dir'] + config['model'] + '_' + timestr
+        best_val_epoch, best_val_acc, final_loss = train_model(model, 
+                                                           train_dataloader, 
+                                                           val_dataloader,
+                                                           optimizer, 
+                                                           model_name, 
+                                                           scheduler, 
+                                                           epochs=config['parameters']['epochs'], 
+                                                           device=device, 
+                                                           save_dir=save_dir,
+                                                           early_stopping_patience=config['parameters']['early_stopping'], 
+                                                           report_interval=config['parameters']['report_interval'],
+                                                    
                                                         )
     print('Training Done')
-    
     config['best_val_acc'] = best_val_acc
     config['best_val_epoch'] = best_val_epoch
     config['final_loss'] = final_loss
@@ -300,9 +419,6 @@ def main(config):
     file = open(f'{save_dir}/config.yaml',"w")
     yaml.dump(config, file)
     file.close()
-    
-    # plot_confusion_matrix(data_loader = val_dataloader, save_dir = save_dir, model = model)
-
     
 if __name__ == '__main__':
 
