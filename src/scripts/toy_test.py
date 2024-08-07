@@ -40,6 +40,11 @@ def load_model(directory_path, model_name='D4'):
             
             print(f'Finished Loading {model_name}')
             break
+        
+        if model is None:
+            print(f"No model containing 'best_model' found in {directory_path}.")
+    
+    return model
 
 
 @torch.no_grad()
