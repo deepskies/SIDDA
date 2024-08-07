@@ -291,8 +291,6 @@ def train_model_da(model,
             if no_improvement_count >= early_stopping_patience:
                 print(f"Early stopping after {early_stopping_patience} epochs without improvement in accuracy.")
                 break
-            
-        return best_val_epoch, best_val_acc, losses[-1]
     
     # Save final model
     if torch.cuda.device_count() > 1:
@@ -336,6 +334,7 @@ def train_model_da(model,
     np.save(os.path.join(save_dir, f"val_domain_losses-{model_name}.npy"), np.array(val_domain_losses))
     np.save(os.path.join(save_dir, f"steps-{model_name}.npy"), np.array(steps))
 
+    return best_val_epoch, best_val_acc, losses[-1]
 
 # We don't need gradients during evaluation.
 @torch.no_grad()
