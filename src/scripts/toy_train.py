@@ -313,6 +313,14 @@ def train_model_da(model,
     # Plotting the losses
     plt.figure(figsize=(14, 8))
     
+    steps = np.array(steps)
+    losses = np.array(losses)
+    train_classification_losses = np.array(train_classification_losses)
+    train_domain_losses = np.array(train_domain_losses)
+    val_losses = np.array(val_losses)
+    val_classification_losses = np.array(val_classification_losses)
+    val_domain_losses = np.array(val_domain_losses)
+    
     # Plot Training Losses
     plt.subplot(2, 1, 1)
     plt.plot(steps, losses, label='Train Total Loss')
