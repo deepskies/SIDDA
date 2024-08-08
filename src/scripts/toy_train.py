@@ -299,6 +299,8 @@ def train_model_da(model,
         torch.save(model.eval().state_dict(), os.path.join(save_dir, "final_model.pt"))
 
     loss_dir = os.path.join(save_dir, 'losses')
+    if not os.path.exists(loss_dir):
+        os.makedirs(loss_dir)
         # Saving losses and steps
     np.save(os.path.join(loss_dir, f"losses-{model_name}.npy"), np.array(losses))
     np.save(os.path.join(loss_dir, f"train_classification_losses-{model_name}.npy"), np.array(train_classification_losses))
@@ -332,7 +334,7 @@ def train_model_da(model,
     plt.legend()
 
     plt.tight_layout()
-    plt.savefig(os.path.join(save_dir, f"losses_plot-{model_name}.png"))
+    plt.savefig(os.path.join(loss_dir, f"losses_plot-{model_name}.png"))
     plt.show()
 
     return best_val_epoch, best_val_acc, best_classification_epoch, best_classification_loss, best_domain_epoch, best_domain_loss, losses[-1]
