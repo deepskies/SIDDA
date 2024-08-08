@@ -331,6 +331,7 @@ def train_model_da(model,
     plt.xlabel('Epochs')
     plt.ylabel('Loss')
     plt.title('Training Losses')
+    plt.yscale('log')
     plt.legend()
 
     # Plot Validation Losses
@@ -341,6 +342,7 @@ def train_model_da(model,
     plt.xlabel('Epochs')
     plt.ylabel('Loss')
     plt.title('Validation Losses')
+    plt.yscale('log')
     plt.legend()
 
     plt.tight_layout()

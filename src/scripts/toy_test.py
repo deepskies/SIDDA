@@ -72,21 +72,12 @@ def compute_metrics(test_loader, model, model_name, save_dir, output_name):
     y_pred, y_true = np.asarray(y_pred), np.asarray(y_true)
     feature_maps = np.asarray(feature_maps)
     flattened_features = feature_maps.reshape(feature_maps.shape[0], -1)
+    np.save(f"{save_dir}/features_{model_name}_{output_name}.npy", flattened_features)
+    np.save(f"{save_dir}/y_pred_{model_name}_{output_name}.npy", y_pred)
     
     confusion_matrix_dir = os.path.join(save_dir, 'confusion_matrix')
     if not os.path.exists(confusion_matrix_dir):
         os.makedirs(confusion_matrix_dir)
-    isomap_dir = os.path.join(save_dir, 'isomap')
-    if not os.path.exists(isomap_dir):
-        os.makedirs(isomap_dir)
-    
-    isomap = Isomap(n_components=2, n_neighbors=5)
-    isomap_embedding = isomap.fit_transform(flattened_features)
-    plt.scatter(isomap_embedding[:, 0], isomap_embedding[:, 1], c=y_pred, cmap='viridis')
-    plt.colorbar()
-    plt.savefig(os.path.join(isomap_dir, f"isomap_{model_name}_{output_name}.png"), bbox_inches='tight')
-    np.save(f"{isomap_dir}/isomap_{model_name}_{output_name}.npy", isomap_embedding)
-    plt.close()
   
     sklearn_report = classification_report(y_true, y_pred, output_dict=True, target_names=classes)
 
@@ -126,7 +117,7 @@ def main(model_dir, output_name, x_test_path, y_test_path, N=None, adversarial_a
     model_name = 'D4'
     models = load_models(model_dir, model_name)
     if not models:
-        print(f"Models could not be loaded.")
+        print("Models could not be loaded.")
         return
     
     for model, model_file_name in models:
