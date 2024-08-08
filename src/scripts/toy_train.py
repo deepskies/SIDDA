@@ -10,7 +10,8 @@ from torch import nn
 from torch.nn import functional as F
 from torch import optim
 from torchvision import transforms
-from toy_models import d4_model, feature_fields
+# from toy_models import d4_model, feature_fields
+from toy_model_simple import d4_model, feature_fields
 from toy_dataset import Shapes
 from tqdm import tqdm
 import random
@@ -38,7 +39,7 @@ def train_model(model,
                 model_name, 
                 scheduler = None, 
                 epochs=100, 
-                device='cuda', 
+                device='cuda' if torch.cuda.is_available() else 'mps',
                 save_dir='checkpoints', 
                 early_stopping_patience=10, 
                 report_interval=5
@@ -450,7 +451,7 @@ def main(config):
         print('Training Done')
         config['best_val_acc'] = best_val_acc
         config['best_val_epoch'] = best_val_epoch
-        config['final_loss'] = final_loss
+        config['final_loss'] = float(final_loss)
         config['feature_fields'] = feature_fields
         config['best_classification_epoch'] = best_classification_epoch
         config['best_classification_loss'] = best_classification_loss
