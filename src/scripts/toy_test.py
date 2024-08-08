@@ -72,6 +72,12 @@ def compute_metrics(test_loader, model, model_name, save_dir, output_name):
     y_pred, y_true = np.asarray(y_pred), np.asarray(y_true)
     feature_maps = np.asarray(feature_maps)
     flattened_features = feature_maps.reshape(feature_maps.shape[0], -1)
+    features_dir = os.path.join(save_dir, 'features')
+    if not os.path.exists(features_dir):
+        os.makedirs(features_dir)
+    y_pred_dir = os.path.join(save_dir, 'y_pred')
+    if not os.path.exists(y_pred_dir):
+        os.makedirs(y_pred_dir)
     np.save(f"{save_dir}/features_{model_name}_{output_name}.npy", flattened_features)
     np.save(f"{save_dir}/y_pred_{model_name}_{output_name}.npy", y_pred)
     

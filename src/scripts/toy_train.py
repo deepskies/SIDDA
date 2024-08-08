@@ -184,10 +184,7 @@ def train_model_da(model,
             
             features, outputs = model(inputs)
             target_features, _ = model(target_inputs)
-            
-            features = features.view(features.size(0), -1)
-            target_features = target_features.view(target_features.size(0), -1)
-            
+                    
             classificaiton_loss = F.cross_entropy(outputs, targets)
             domain_loss = sinkhorn_loss(features, target_features)            
             loss = classificaiton_loss + scale_factor * domain_loss
