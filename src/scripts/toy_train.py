@@ -314,6 +314,7 @@ def train_model_da(model,
     plt.figure(figsize=(14, 8))
     
     steps = np.array(steps)
+    validation_steps = steps[::report_interval]
     losses = np.array(losses)
     train_classification_losses = np.array(train_classification_losses)
     train_domain_losses = np.array(train_domain_losses)
@@ -333,9 +334,9 @@ def train_model_da(model,
 
     # Plot Validation Losses
     plt.subplot(2, 1, 2)
-    plt.plot(steps // report_interval, val_losses, label='Validation Total Loss')
-    plt.plot(steps // report_interval, val_classification_losses, label='Validation Classification Loss')
-    plt.plot(steps // report_interval, val_domain_losses, label='Validation Domain Loss')
+    plt.plot(validation_steps, val_losses, label='Validation Total Loss')
+    plt.plot(validation_steps, val_classification_losses, label='Validation Classification Loss')
+    plt.plot(validation_steps, val_domain_losses, label='Validation Domain Loss')
     plt.xlabel('Epochs')
     plt.ylabel('Loss')
     plt.title('Validation Losses')
