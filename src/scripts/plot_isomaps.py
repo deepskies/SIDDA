@@ -64,10 +64,13 @@ def load_and_combine_predictions(directory_path):
     return predictions
 
 def perform_isomap_and_plot(features, predictions, base_name):
+    
+    prediction_base_name = base_name.replace('features', 'y_pred')
+
     isomap = Isomap(n_components=2, n_neighbors=5)
     isomap_embedding = isomap.fit_transform(features[base_name][0])  # Combined feature map
     plt.figure(figsize=(8, 6))
-    plt.scatter(isomap_embedding[:, 0], isomap_embedding[:, 1], c=predictions[base_name][0], cmap='viridis')  # Combined predictions
+    plt.scatter(isomap_embedding[:, 0], isomap_embedding[:, 1], c=predictions[prediction_base_name][0], cmap='viridis')  # Combined predictions
     plt.colorbar()
     plt.title(f'Isomap for {base_name}')
     plt.savefig(os.path.join(isomap_dir, f"{base_name}_isomap.png"), bbox_inches='tight')
