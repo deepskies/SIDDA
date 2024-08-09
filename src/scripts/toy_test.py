@@ -78,8 +78,8 @@ def compute_metrics(test_loader, model, model_name, save_dir, output_name):
     y_pred_dir = os.path.join(save_dir, 'y_pred')
     if not os.path.exists(y_pred_dir):
         os.makedirs(y_pred_dir)
-    np.save(f"{save_dir}/features_{model_name}_{output_name}.npy", flattened_features)
-    np.save(f"{save_dir}/y_pred_{model_name}_{output_name}.npy", y_pred)
+    np.save(f"{features_dir}/features_{model_name}_{output_name}.npy", flattened_features)
+    np.save(f"{y_pred_dir}/y_pred_{model_name}_{output_name}.npy", y_pred)
     
     confusion_matrix_dir = os.path.join(save_dir, 'confusion_matrix')
     if not os.path.exists(confusion_matrix_dir):
