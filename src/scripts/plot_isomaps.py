@@ -23,7 +23,7 @@ def load_and_combine_feature_maps(directory_path):
             
             # Combine maps with the same base name
             if base_name in maps:
-                maps[base_name] = (maps[base_name][0] + feature_map, maps[base_name][1] + "_combined")
+                maps[base_name] = (np.concatenate((maps[base_name][0], feature_map), axis=0), maps[base_name][1] + "_combined")
             else:
                 maps[base_name] = (feature_map, feature_map_no_ext)
             
@@ -52,7 +52,7 @@ def load_and_combine_predictions(directory_path):
             
             # Combine predictions with the same base name
             if base_name in predictions:
-                predictions[base_name] = (predictions[base_name][0] + prediction, predictions[base_name][1] + "_combined")
+                predictions[base_name] = (np.concatenate((predictions[base_name][0], prediction), axis=0), predictions[base_name][1] + "_combined")
             else:
                 predictions[base_name] = (prediction, prediction_name_no_ext)
             
@@ -64,25 +64,38 @@ def load_and_combine_predictions(directory_path):
     return predictions
 
 def perform_isomap_and_plot(features, predictions, base_name):
-    
     prediction_base_name = base_name.replace('features', 'y_pred')
 
     isomap = Isomap(n_components=2, n_neighbors=5)
     isomap_embedding = isomap.fit_transform(features[base_name][0])  # Combined feature map
+
+    # Separate embeddings for normal and noisy datasets
+    num_normal = len(os.listdir(f'{args.path}/features')) // 2
+    embedding_normal = isomap_embedding[:num_normal]
+    embedding_noisy = isomap_embedding[num_normal:]
+
     plt.figure(figsize=(8, 6))
-    plt.scatter(isomap_embedding[:, 0], isomap_embedding[:, 1], c=predictions[prediction_base_name][0], cmap='viridis')  # Combined predictions
+
+    # Plot normal dataset with circle markers
+    plt.scatter(embedding_normal[:, 0], embedding_normal[:, 1], 
+                c=predictions[prediction_base_name][0][:num_normal], 
+                cmap='viridis', marker='o', label='Original')
+
+    # Plot noisy dataset with x markers
+    plt.scatter(embedding_noisy[:, 0], embedding_noisy[:, 1], 
+                c=predictions[prediction_base_name][0][num_normal:], 
+                cmap='viridis', marker='x', label='Noisy')
+
     plt.colorbar()
     plt.title(f'Isomap for {base_name}')
+    plt.legend()
     plt.savefig(os.path.join(isomap_dir, f"{base_name}_isomap.png"), bbox_inches='tight')
     plt.close()
-
-
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Evaluate Galaxy10 models')
     parser.add_argument('--path', type=str, default='data/feature_maps', help='Path to the directory containing the training output files')
     args = parser.parse_args()
-    
     
     combined_feature_maps = load_and_combine_feature_maps(f'{args.path}/features')
     combined_predictions = load_and_combine_predictions(f'{args.path}/y_pred')
@@ -91,6 +104,6 @@ if __name__ == '__main__':
     if not os.path.exists(isomap_dir):
         os.makedirs(isomap_dir)
     
-   # Perform Isomap and plot for each base name
+    # Perform Isomap and plot for each base name
     for base_name in combined_feature_maps.keys():
         perform_isomap_and_plot(combined_feature_maps, combined_predictions, base_name)
