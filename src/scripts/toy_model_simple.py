@@ -117,11 +117,12 @@ class CNN(nn.Module):
     def forward(self, x):
         x = F.relu(self.conv1(x))
         x = F.relu(self.conv2(x))
-        # Adjusting the view operation for the new image size
         x = x.view(-1, 32 * 100 * 100)
-        x = F.relu(self.fc1(x))
-        x = self.fc2(x)
-        return x
+        latent_space = F.relu(self.fc1(x))
+        print(latent_space.shape)
+        output = self.fc2(latent_space)
+        
+        return latent_space, output
     
     
 def cnn():
