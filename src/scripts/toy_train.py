@@ -20,7 +20,7 @@ import geomloss
 def sinkhorn_loss(x, 
                   y,
             ):
-    loss = geomloss.SamplesLoss(loss='sinkhorn', scaling=0.8)
+    loss = geomloss.SamplesLoss(loss=config['DA_metric'], scaling=0.8)
     return loss(x, y)
 
 
