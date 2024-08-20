@@ -79,7 +79,7 @@ def perform_isomap_and_plot(features, predictions, base_name):
     # Plot normal dataset with circle markers
     plt.scatter(embedding_normal[:, 0], embedding_normal[:, 1], 
                 c=predictions[prediction_base_name][0][:num_normal], 
-                cmap='viridis', marker='o', label='Original')
+                cmap='viridis', marker='*', label='Original')
 
     # Plot noisy dataset with x markers
     plt.scatter(embedding_noisy[:, 0], embedding_noisy[:, 1], 

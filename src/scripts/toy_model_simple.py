@@ -3,7 +3,6 @@ import torch.nn as nn
 from torch.nn import functional as F
 from escnn import gspaces
 from escnn import nn as escnn_nn
-import cnn
 import torchvision
 from torchsummary import summary
 from torchvision import transforms
@@ -105,6 +104,29 @@ class SimplifiedSteerableCNN(torch.nn.Module):
         features = x
         x = self.fully_net(x.reshape(x.shape[0], -1))
         return features, x
+    
+    
+class CNN(nn.Module):
+    def __init__(self, num_classes):
+        super(CNN, self).__init__()
+        self.conv1 = nn.Conv2d(in_channels=1, out_channels=16, kernel_size=3, stride=1, padding=1)
+        self.conv2 = nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, stride=1, padding=1)
+        self.fc1 = nn.Linear(in_features=32 * 100 * 100, out_features=128)
+        self.fc2 = nn.Linear(in_features=128, out_features=num_classes)
+
+    def forward(self, x):
+        x = F.relu(self.conv1(x))
+        x = F.relu(self.conv2(x))
+        # Adjusting the view operation for the new image size
+        x = x.view(-1, 32 * 100 * 100)
+        x = F.relu(self.fc1(x))
+        x = self.fc2(x)
+        return x
+    
+    
+def cnn():
+    model = CNN(num_classes=num_classes)
+    return model
 
 
 def d4_model():
