@@ -67,10 +67,11 @@ def perform_isomap_and_plot(features, predictions, base_name, isomap_dir, path):
     prediction_base_name = base_name.replace('features', 'y_pred')
 
     isomap = Isomap(n_components=2, n_neighbors=5)
-    isomap_embedding = isomap.fit_transform(features[base_name][0])  # Combined feature map
+    combined_features = features[base_name][0]  # Combined feature map
+    isomap_embedding = isomap.fit_transform(combined_features)
 
     # Calculate the split point based on the original data
-    num_normal = len(os.listdir(os.path.join(path, 'features'))) // 2
+    num_normal = len(combined_features) // 2
     embedding_normal = isomap_embedding[:num_normal]
     embedding_noisy = isomap_embedding[num_normal:]
 
