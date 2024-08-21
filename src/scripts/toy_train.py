@@ -20,7 +20,7 @@ import geomloss
 def sinkhorn_loss(x, 
                   y,
             ):
-    loss = geomloss.SamplesLoss(loss=config['DA_metric'], scaling=0.8)
+    loss = geomloss.SamplesLoss(loss=config['DA_metric'], blur = 0.2, scaling = 0.4)
     return loss(x, y)
 
 
@@ -184,6 +184,12 @@ def train_model_da(model,
             
             features, outputs = model(inputs)
             target_features, _ = model(target_inputs)
+            
+            features = features.view(features.size(0), -1)
+            target_features = target_features.view(target_features.size(0), -1)
+            
+            if torch.isnan(features).any() or torch.isinf(features).any() or torch.isnan(target_features).any() or torch.isinf(target_features).any():
+                print("NaNs or Infinities detected in features!")
                     
             classification_loss = F.cross_entropy(outputs, targets)
             domain_loss = sinkhorn_loss(features, target_features)            
