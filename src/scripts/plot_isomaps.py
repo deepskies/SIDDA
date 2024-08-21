@@ -63,14 +63,14 @@ def load_and_combine_predictions(directory_path):
     
     return predictions
 
-def perform_isomap_and_plot(features, predictions, base_name):
+def perform_isomap_and_plot(features, predictions, base_name, isomap_dir, path):
     prediction_base_name = base_name.replace('features', 'y_pred')
 
     isomap = Isomap(n_components=2, n_neighbors=5)
     isomap_embedding = isomap.fit_transform(features[base_name][0])  # Combined feature map
 
-    # Separate embeddings for normal and noisy datasets
-    num_normal = len(os.listdir(f'{args.path}/features')) // 2
+    # Calculate the split point based on the original data
+    num_normal = len(os.listdir(os.path.join(path, 'features'))) // 2
     embedding_normal = isomap_embedding[:num_normal]
     embedding_noisy = isomap_embedding[num_normal:]
 
@@ -106,4 +106,4 @@ if __name__ == '__main__':
     
     # Perform Isomap and plot for each base name
     for base_name in combined_feature_maps.keys():
-        perform_isomap_and_plot(combined_feature_maps, combined_predictions, base_name)
+        perform_isomap_and_plot(combined_feature_maps, combined_predictions, base_name, isomap_dir, args.path)
