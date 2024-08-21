@@ -106,52 +106,59 @@ class SimplifiedSteerableCNN(torch.nn.Module):
         return features, x
     
     
-class CNN(nn.Module):
-    def __init__(self, num_classes):
-        super(CNN, self).__init__()
-        # First block
-        self.conv1 = nn.Conv2d(in_channels=1, out_channels=32, kernel_size=3, stride=1, padding=1)
-        self.bn1 = nn.BatchNorm2d(32)
+class ConvNet(nn.Module):
+    def __init__(self, num_classes=3):
+        super(ConvNet, self).__init__()
+        # First Convolutional Layer
+        self.conv1 = nn.Conv2d(in_channels=1, out_channels=8, kernel_size=5, stride=1, padding=2)
+        self.bn1 = nn.BatchNorm2d(8)
+        self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
         
-        # Second block
-        self.conv2 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, stride=1, padding=1)
-        self.bn2 = nn.BatchNorm2d(64)
+        # Second Convolutional Layer
+        self.conv2 = nn.Conv2d(in_channels=8, out_channels=16, kernel_size=3, stride=1, padding=1)
+        self.bn2 = nn.BatchNorm2d(16)
+        self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
         
-        # Third block
-        self.conv3 = nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, stride=1, padding=1)
-        self.bn3 = nn.BatchNorm2d(128)
+        # Third Convolutional Layer
+        self.conv3 = nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, stride=1, padding=1)
+        self.bn3 = nn.BatchNorm2d(32)
+        self.pool3 = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
         
-        # Fully connected layers
-        self.fc1 = nn.Linear(in_features=128 * 100 * 100, out_features=256)
+        # Bottleneck Layer (Fully Connected)
+        self.fc1 = nn.Linear(in_features=32 * 12 * 12, out_features=256)
+        
+        # Output Layer (Fully Connected)
         self.fc2 = nn.Linear(in_features=256, out_features=num_classes)
-        
-        # Dropout layer
-        self.dropout = nn.Dropout(0.5)
 
     def forward(self, x):
-        # First block
+        # First Convolutional Block
         x = F.relu(self.bn1(self.conv1(x)))
+        x = self.pool1(x)
         
-        # Second block
+        # Second Convolutional Block
         x = F.relu(self.bn2(self.conv2(x)))
+        x = self.pool2(x)
         
-        # Third block
+        # Third Convolutional Block
         x = F.relu(self.bn3(self.conv3(x)))
+        x = self.pool3(x)
         
-        # Flatten the output to feed into the fully connected layers
-        latent_space = x.view(-1, 128 * 100 * 100)
+        # Flattening
+        x = x.view(-1, 32 * 12 * 12)
         
-        # Fully connected layers with dropout
-        x = F.relu(self.fc1(latent_space))
-        x = self.dropout(x)
-        output = self.fc2(x)
+        # Bottleneck Layer
+        x = F.relu(self.fc1(x))
+        latent_space = x
         
-        return latent_space, output
+        # Output Layer
+        x = self.fc2(x)
+        
+        return latent_space, x
     
-    
-def cnn():
-    model = CNN(num_classes=num_classes)
+def convnet():
+    model = ConvNet(num_classes=num_classes)
     return model
+
 
 
 def d4_model():
@@ -160,7 +167,7 @@ def d4_model():
 
 
 if __name__ == "__main__":
-    model = d4_model()
+    model = convnet()
     print(summary(model, (1, 100, 100)))
     x = torch.randn(32, 1, 100 ,100)
     output = model(x)

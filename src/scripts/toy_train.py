@@ -11,7 +11,7 @@ from torch.nn import functional as F
 from torch import optim
 from torchvision import transforms
 # from toy_models import d4_model, feature_fields
-from toy_model_simple import d4_model, feature_fields, cnn
+from toy_model_simple import convnet as cnn
 from toy_dataset import Shapes
 from tqdm import tqdm
 import random
@@ -185,16 +185,16 @@ def train_model_da(model,
             features, outputs = model(inputs)
             target_features, _ = model(target_inputs)
                     
-            classificaiton_loss = F.cross_entropy(outputs, targets)
+            classification_loss = F.cross_entropy(outputs, targets)
             domain_loss = sinkhorn_loss(features, target_features)            
-            loss = classificaiton_loss + scale_factor * domain_loss
+            loss = classification_loss + scale_factor * domain_loss
             
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
             train_loss += loss.item()
-            classification_losses.append(classificaiton_loss.item())
+            classification_losses.append(classification_loss.item())
             domain_losses.append(domain_loss.item())
 
         train_loss /= len(train_dataloader)
@@ -451,7 +451,7 @@ def main(config):
         config['best_val_acc'] = best_val_acc
         config['best_val_epoch'] = best_val_epoch
         config['final_loss'] = float(final_loss)
-        config['feature_fields'] = feature_fields
+        # config['feature_fields'] = feature_fields
         config['best_classification_epoch'] = best_classification_epoch
         config['best_classification_loss'] = best_classification_loss
         config['best_domain_epoch'] = best_domain_epoch
@@ -476,7 +476,7 @@ def main(config):
         config['best_val_acc'] = best_val_acc
         config['best_val_epoch'] = best_val_epoch
         config['final_loss'] = final_loss
-        config['feature_fields'] = feature_fields
+        # config['feature_fields'] = feature_fields
 
     file = open(f'{save_dir}/config.yaml',"w")
     yaml.dump(config, file)
