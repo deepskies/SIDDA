@@ -97,7 +97,7 @@ def compute_metrics(test_loader, model, model_name, save_dir, output_name):
     
     return sklearn_report
 @torch.no_grad()
-def main(model_dir, output_name, x_test_path, y_test_path, N=None, adversarial_attack=False):
+def main(model_dir, output_name, x_test_path, y_test_path, N=None, adversarial_attack=False, model_name='cnn'):
     
     metrics_dir = os.path.join(model_dir, 'metrics')
     if not os.path.exists(metrics_dir):
@@ -120,7 +120,6 @@ def main(model_dir, output_name, x_test_path, y_test_path, N=None, adversarial_a
     test_dataset = Shapes(x_test_path, y_test_path, transform=transform)
     test_dataloader = DataLoader(test_dataset, batch_size=128, shuffle=True)
 
-    model_name = 'D4'
     models = load_models(model_dir, model_name)
     if not models:
         print("Models could not be loaded.")
@@ -183,4 +182,5 @@ if __name__ == '__main__':
     parser.add_argument('--adversarial_attack', action='store_true', help='Apply adversarial attack to the input data')
     args = parser.parse_args()
     
-    main(model_dir=args.model_path, output_name=args.output_name, x_test_path=args.x_test_path, y_test_path=args.y_test_path, adversarial_attack=args.adversarial_attack)
+    main(model_dir=args.model_path, output_name=args.output_name, x_test_path=args.x_test_path, y_test_path=args.y_test_path, adversarial_attack=args.adversarial_attack,
+         model_name='cnn')

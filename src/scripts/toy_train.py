@@ -350,7 +350,7 @@ def train_model_da(model,
 
 def main(config):
     model = cnn()
-    model_name = 'D4'
+    model_name = str(config['model'])
     params_to_optimize = [p for p in model.parameters() if p.requires_grad]
     optimizer = optim.AdamW(params_to_optimize, 
                             lr = config['parameters']['lr'], 
