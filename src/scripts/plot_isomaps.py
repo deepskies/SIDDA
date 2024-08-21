@@ -74,21 +74,25 @@ def perform_isomap_and_plot(features, predictions, base_name, isomap_dir, path):
     embedding_normal = isomap_embedding[:num_normal]
     embedding_noisy = isomap_embedding[num_normal:]
 
-    plt.figure(figsize=(8, 6))
+    plt.figure(figsize=(16, 6))
 
-    # Plot normal dataset with circle markers
+    # Subplot for normal dataset
+    plt.subplot(1, 2, 1)
     plt.scatter(embedding_normal[:, 0], embedding_normal[:, 1], 
                 c=predictions[prediction_base_name][0][:num_normal], 
-                cmap='viridis', marker='*', label='Original')
+                cmap='viridis', marker='o')
+    plt.title(f'Isomap for Original {base_name}')
+    plt.colorbar()
 
-    # Plot noisy dataset with x markers
+    # Subplot for noisy dataset
+    plt.subplot(1, 2, 2)
     plt.scatter(embedding_noisy[:, 0], embedding_noisy[:, 1], 
                 c=predictions[prediction_base_name][0][num_normal:], 
-                cmap='viridis', marker='x', label='Noisy')
-
+                cmap='viridis', marker='x')
+    plt.title(f'Isomap for Noisy {base_name}')
     plt.colorbar()
-    plt.title(f'Isomap for {base_name}')
-    plt.legend()
+
+    plt.suptitle(f'Isomap Embeddings for {base_name}', fontsize=16)
     plt.savefig(os.path.join(isomap_dir, f"{base_name}_isomap.png"), bbox_inches='tight')
     plt.close()
 
