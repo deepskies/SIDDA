@@ -147,7 +147,7 @@ class ConvNet(nn.Module):
         x = x.view(-1, 32 * 12 * 12)
         
         # Bottleneck Layer
-        x = F.relu(self.fc1(x))
+        x = self.fc1(x)
         latent_space = x
         
         # Output Layer
