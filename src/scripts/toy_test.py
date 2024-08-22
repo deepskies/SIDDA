@@ -11,10 +11,10 @@ from torchvision import transforms
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 import torch.nn as nn
-from toy_models import d4_model
+# from toy_models import d4_model
+from toy_model_simple import d4_model
 from toy_dataset import Shapes
 from utils import OnePixelAttack
-from sklearn.manifold import Isomap
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 

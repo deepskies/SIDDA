@@ -155,20 +155,108 @@ class ConvNet(nn.Module):
         
         return latent_space, x
     
-def convnet():
+class D4ConvNet(nn.Module):
+    def __init__(self, num_classes=3):
+        super(D4ConvNet, self).__init__()
+
+        # D4 Group for 2D images
+        self.r2_act = gspaces.flipRot2dOnR2(N=4)  # D4 group with 4 rotations and flip
+
+        # First Convolutional Layer
+        self.input_type = escnn_nn.FieldType(self.r2_act, [self.r2_act.trivial_repr])
+        self.conv1 = escnn_nn.R2Conv(
+            in_type=self.input_type,
+            out_type=escnn_nn.FieldType(self.r2_act, 8 * [self.r2_act.regular_repr]),
+            kernel_size=5,
+            padding=2
+        )
+        self.bn1 = escnn_nn.InnerBatchNorm(self.conv1.out_type)
+        self.relu1 = escnn_nn.ReLU(self.conv1.out_type)
+        self.pool1 = escnn_nn.PointwiseMaxPool2D(self.conv1.out_type, kernel_size=2, stride=2, padding=0)
+
+        # Second Convolutional Layer
+        self.conv2 = escnn_nn.R2Conv(
+            in_type=self.conv1.out_type,
+            out_type=escnn_nn.FieldType(self.r2_act, 16 * [self.r2_act.regular_repr]),
+            kernel_size=3,
+            padding=1
+        )
+        print(self.r2_act.trivial_repr.size)
+        print(self.r2_act.regular_repr.size)
+        self.bn2 = escnn_nn.InnerBatchNorm(self.conv2.out_type)
+        self.relu2 = escnn_nn.ReLU(self.conv2.out_type)
+        self.pool2 = escnn_nn.PointwiseMaxPool2D(self.conv2.out_type, kernel_size=2, stride=2, padding=0)
+
+        # Third Convolutional Layer
+        self.conv3 = escnn_nn.R2Conv(
+            in_type=self.conv2.out_type,
+            out_type=escnn_nn.FieldType(self.r2_act, 32 * [self.r2_act.regular_repr]),
+            kernel_size=3,
+            padding=1
+        )
+        self.bn3 = escnn_nn.InnerBatchNorm(self.conv3.out_type)
+        self.relu3 = escnn_nn.ReLU(self.conv3.out_type)
+        self.pool3 = escnn_nn.PointwiseMaxPool2D(self.conv3.out_type, kernel_size=2, stride=2, padding=0)
+        
+        self.gpool = escnn_nn.GroupPooling(self.pool3.out_type)
+        
+        c = self.gpool.out_type.size
+
+        self.fc1 = nn.Linear(in_features=144*c, out_features=256)
+        self.fc2 = nn.Linear(in_features=256, out_features=num_classes)
+
+    def forward(self, x):
+        x = escnn_nn.GeometricTensor(x, self.input_type)
+        
+        x = self.pool1(self.relu1(self.bn1(self.conv1(x))))
+        x = self.pool2(self.relu2(self.bn2(self.conv2(x))))
+        x = self.pool3(self.relu3(self.bn3(self.conv3(x))))
+        
+        x = self.gpool(x)
+        print(x.tensor.shape)
+
+        x = x.tensor.view(x.tensor.size(0), -1)
+        x = F.relu(self.fc1(x))
+        latent_space = x
+
+        x = self.fc2(x)
+
+        return latent_space, x
+
+
+
+
+    
+def cnn():
     model = ConvNet(num_classes=num_classes)
     return model
 
 
 
 def d4_model():
-    model = SimplifiedSteerableCNN(N=4,reflections=True, num_classes=num_classes)
+    model = D4ConvNet(num_classes=num_classes)
     return model
 
 
 if __name__ == "__main__":
-    model = convnet()
-    print(summary(model, (1, 100, 100)))
+    from prettytable import PrettyTable
+    
+    def print_model_parameters(model):
+        table = PrettyTable(["Modules", "Parameters"])
+        total_params = 0
+        for name, parameter in model.named_parameters():
+            if not parameter.requires_grad:
+                continue
+            param = parameter.numel()
+            table.add_row([name, param])
+            total_params += param
+        print(table)
+        print(f"Total Trainable Params: {total_params}")
+        
+    model = d4_model()
+    print_model_parameters(model)
+    # print(summary(model, (1, 100, 100)))
+    # print(sum(p.numel() for p in model.parameters() if p.requires_grad and p not in model.fc1.parameters() and p not in model.fc2.parameters()))
     x = torch.randn(32, 1, 100 ,100)
     output = model(x)
     print(output[0].shape)
