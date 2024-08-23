@@ -171,18 +171,17 @@ def train_model_da(model,
     
     print("Training Started!")
     
+    if dynamic_weighting:
+        classification_weight = torch.nn.Parameter(torch.tensor(0.5, device=device))
+        domain_weight = torch.nn.Parameter(torch.tensor(0.5, device=device))
+        
+        optimizer.add_param_group({'params': [classification_weight, domain_weight]})
+    
     for epoch in range(epochs):
         model.train()
         train_loss = 0.0
         classification_losses, domain_losses = [], []
-        
-        if dynamic_weighting:
-            classification_weight = torch.nn.Parameter(torch.tensor(0.5, device=device))
-            domain_weight = torch.nn.Parameter(torch.tensor(0.5, device=device))
-            
-            optimizer.add_param_group({'params': [classification_weight, domain_weight]})
-
-        
+     
         for i, (batch, target_batch) in tqdm(enumerate(zip(train_dataloader, target_dataloader))):
             inputs, targets = batch
             inputs, targets = inputs.to(device).float(), targets.to(device)
