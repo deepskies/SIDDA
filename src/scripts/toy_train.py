@@ -208,6 +208,7 @@ def train_model_da(model,
             
             optimizer.zero_grad()
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer.step()
             
             if dynamic_weighting:
