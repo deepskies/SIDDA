@@ -181,8 +181,7 @@ class D4ConvNet(nn.Module):
             kernel_size=3,
             padding=1
         )
-        print(self.r2_act.trivial_repr.size)
-        print(self.r2_act.regular_repr.size)
+
         self.bn2 = escnn_nn.InnerBatchNorm(self.conv2.out_type)
         self.relu2 = escnn_nn.ReLU(self.conv2.out_type)
         self.pool2 = escnn_nn.PointwiseMaxPool2D(self.conv2.out_type, kernel_size=2, stride=2, padding=0)
@@ -213,25 +212,18 @@ class D4ConvNet(nn.Module):
         x = self.pool3(self.relu3(self.bn3(self.conv3(x))))
         
         x = self.gpool(x)
-        print(x.tensor.shape)
-
+        
         x = x.tensor.view(x.tensor.size(0), -1)
-        x = F.relu(self.fc1(x))
+        x = self.fc1(x)
         latent_space = x
 
         x = self.fc2(x)
 
         return latent_space, x
 
-
-
-
-    
 def cnn():
     model = ConvNet(num_classes=num_classes)
     return model
-
-
 
 def d4_model():
     model = D4ConvNet(num_classes=num_classes)

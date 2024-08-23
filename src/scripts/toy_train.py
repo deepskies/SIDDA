@@ -149,7 +149,8 @@ def train_model_da(model,
                 device='cuda', 
                 save_dir='checkpoints', 
                 early_stopping_patience=10, 
-                report_interval=5
+                report_interval=5,
+                dynamic_weighting = False
             ):
     
     if not os.path.exists(save_dir):
@@ -175,6 +176,13 @@ def train_model_da(model,
         train_loss = 0.0
         classification_losses, domain_losses = [], []
         
+        if dynamic_weighting:
+            classification_weight = torch.nn.Parameter(torch.tensor(0.5, device=device))
+            domain_weight = torch.nn.Parameter(torch.tensor(0.5, device=device))
+            
+            optimizer.add_param_group({'params': [classification_weight, domain_weight]})
+
+        
         for i, (batch, target_batch) in tqdm(enumerate(zip(train_dataloader, target_dataloader))):
             inputs, targets = batch
             inputs, targets = inputs.to(device).float(), targets.to(device)
@@ -192,8 +200,13 @@ def train_model_da(model,
                 print("NaNs or Infinities detected in features!")
                     
             classification_loss = F.cross_entropy(outputs, targets)
-            domain_loss = sinkhorn_loss(features, target_features)            
-            loss = classification_loss + scale_factor * domain_loss
+            domain_loss = sinkhorn_loss(features, target_features)
+            
+            if dynamic_weighting:
+                loss = classification_weight * classification_loss + domain_weight * domain_loss
+            
+            else:        
+                loss = classification_loss + scale_factor * domain_loss
             
             optimizer.zero_grad()
             loss.backward()
@@ -236,7 +249,11 @@ def train_model_da(model,
                     
                     classification_loss_ = F.cross_entropy(outputs, targets)
                     domain_loss_ = sinkhorn_loss(features, target_features)
-                    combined_loss = classification_loss_ + scale_factor * domain_loss_
+                    
+                    if dynamic_weighting:
+                        combined_loss = classification_weight * classification_loss_ + domain_weight * domain_loss_
+                    else:
+                        combined_loss = classification_loss_ + scale_factor * domain_loss_
                     
                     val_loss += combined_loss.item()
                     val_classification_loss += classification_loss_.item()
