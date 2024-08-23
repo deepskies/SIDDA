@@ -11,7 +11,7 @@ from torch.nn import functional as F
 from torch import optim
 from torchvision import transforms
 # from toy_models import d4_model, feature_fields
-from toy_model_simple import convnet, d4_model
+from toy_model_simple import cnn, d4_model
 from toy_dataset import Shapes
 from tqdm import tqdm
 import random
