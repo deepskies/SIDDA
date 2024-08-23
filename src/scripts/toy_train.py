@@ -468,7 +468,8 @@ def main(config):
                                                                                                                                                     device=device, 
                                                                                                                                                     save_dir=save_dir,
                                                                                                                                                     early_stopping_patience=config['parameters']['early_stopping'], 
-                                                                                                                                                    report_interval=config['parameters']['report_interval']
+                                                                                                                                                    report_interval=config['parameters']['report_interval'],
+                                                                                                                                                    dynamic_weighting=config['dynamic_weighting']
                                                                                    )
         print('Training Done')
         config['best_val_acc'] = best_val_acc
