@@ -172,11 +172,10 @@ def train_model_da(model,
     print("Training Started!")
     
     if dynamic_weighting:
-        classification_weight = torch.nn.Parameter(torch.tensor(0.5, device=device))
-        domain_weight = torch.nn.Parameter(torch.tensor(0.5, device=device))
-        
-        optimizer.add_param_group({'params': [classification_weight, domain_weight]})
-    
+        sigma_1 = torch.nn.Parameter(torch.tensor(1.0, device=device))
+        sigma_2 = torch.nn.Parameter(torch.tensor(1.0, device=device))
+        optimizer.add_param_group({'params': [sigma_1, sigma_2]})
+            
     for epoch in range(epochs):
         model.train()
         train_loss = 0.0
@@ -202,7 +201,7 @@ def train_model_da(model,
             domain_loss = sinkhorn_loss(features, target_features)
             
             if dynamic_weighting:
-                loss = classification_weight * classification_loss + domain_weight * domain_loss
+                loss = (1 / (2 * sigma_1**2)) * classification_loss + (1 / (2 * sigma_2**2)) * domain_loss + torch.log(sigma_1 * sigma_2)
             
             else:        
                 loss = classification_loss + scale_factor * domain_loss
@@ -250,7 +249,7 @@ def train_model_da(model,
                     domain_loss_ = sinkhorn_loss(features, target_features)
                     
                     if dynamic_weighting:
-                        combined_loss = classification_weight * classification_loss_ + domain_weight * domain_loss_
+                        combined_loss = (1 / (2 * sigma_1**2)) * classification_loss_ + (1 / (2 * sigma_2**2)) * domain_loss_ + torch.log(sigma_1 * sigma_2)
                     else:
                         combined_loss = classification_loss_ + scale_factor * domain_loss_
                     
