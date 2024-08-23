@@ -209,6 +209,11 @@ def train_model_da(model,
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+            
+            if dynamic_weighting:
+                    with torch.no_grad():
+                        sigma_1.clamp_(min=1e-3, max = 2.0)
+                        sigma_2.clamp_(min=1e-3, max = 2.0)
 
             train_loss += loss.item()
             classification_losses.append(classification_loss.item())
