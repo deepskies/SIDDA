@@ -201,7 +201,7 @@ def train_model_da(model,
             domain_loss = sinkhorn_loss(features, target_features)
             
             if dynamic_weighting:
-                loss = (1 / (2 * sigma_1**2)) * classification_loss + (1 / (2 * sigma_2**2)) * domain_loss + torch.log(sigma_1 * sigma_2)
+                loss = (1 / (2 * sigma_1**2)) * classification_loss + (0.1 / (2 * sigma_2**2)) * domain_loss + torch.log(sigma_1 * sigma_2)
             
             else:        
                 loss = classification_loss + scale_factor * domain_loss

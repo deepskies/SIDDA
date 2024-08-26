@@ -126,9 +126,13 @@ class ConvNet(nn.Module):
         
         # Bottleneck Layer (Fully Connected)
         self.fc1 = nn.Linear(in_features=32 * 12 * 12, out_features=256)
+        self.fc1.weight.data.normal_(0, .005)
+        self.fc1.bias.data.fill_(0.0)
         
         # Output Layer (Fully Connected)
         self.fc2 = nn.Linear(in_features=256, out_features=num_classes)
+        self.fc2.weight.data.normal_(0, 0.01)
+        self.fc.bias.data.fill_(0.0)
 
     def forward(self, x):
         # First Convolutional Block
@@ -202,7 +206,13 @@ class D4ConvNet(nn.Module):
         c = self.gpool.out_type.size
 
         self.fc1 = nn.Linear(in_features=144*c, out_features=256)
+        self.fc1.weight.data.normal_(0, .005)
+        self.fc1.bias.data.fill_(0.0)
+        self.layer_norm = nn.LayerNorm(256)
+
         self.fc2 = nn.Linear(in_features=256, out_features=num_classes)
+        self.fc2.weight.data.normal_(0, 0.01)
+        self.fc2.bias.data.fill_(0.0)
 
     def forward(self, x):
         x = escnn_nn.GeometricTensor(x, self.input_type)
@@ -215,6 +225,7 @@ class D4ConvNet(nn.Module):
         
         x = x.tensor.view(x.tensor.size(0), -1)
         x = self.fc1(x)
+        x = self.layer_norm(x)
         latent_space = x
 
         x = self.fc2(x)
