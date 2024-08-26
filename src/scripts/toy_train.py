@@ -204,7 +204,7 @@ def train_model_da(model,
                 print("NaNs or Infinities detected in features!")
                     
             classification_loss = F.cross_entropy(outputs, targets)
-            domain_loss = sinkhorn_loss(features, target_features, blur = 0.1 * max_distance)
+            domain_loss = sinkhorn_loss(features, target_features, blur = 0.1 * max_distance.detach().cpu().numpy())
             
             if dynamic_weighting:
                 loss = (1 / (2 * sigma_1**2)) * classification_loss + (0.1 / (2 * sigma_2**2)) * domain_loss + torch.log(sigma_1 * sigma_2)
@@ -259,7 +259,7 @@ def train_model_da(model,
                     target_features = target_features.view(target_features.size(0), -1)
                     
                     classification_loss_ = F.cross_entropy(outputs, targets)
-                    domain_loss_ = sinkhorn_loss(features, target_features)
+                    domain_loss_ = sinkhorn_loss(features, target_features, blur = 0.1 * max_distance.detach().cpu().numpy())
                     
                     if dynamic_weighting:
                         combined_loss = (1 / (2 * sigma_1**2)) * classification_loss_ + (1 / (2 * sigma_2**2)) * domain_loss_ + torch.log(sigma_1 * sigma_2)
