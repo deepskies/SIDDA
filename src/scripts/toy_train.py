@@ -19,8 +19,9 @@ import geomloss
 
 def sinkhorn_loss(x, 
                   y,
+                  blur
             ):
-    loss = geomloss.SamplesLoss(loss=config['DA_metric'], blur = config['parameters']['blur'], scaling = config['parameters']['scaling'])
+    loss = geomloss.SamplesLoss(loss=config['DA_metric'], blur = blur, scaling = config['parameters']['scaling'])
     return loss(x, y)
 
 
@@ -168,6 +169,7 @@ def train_model_da(model,
     losses, steps = [], []
     train_classification_losses, train_domain_losses = [], []
     val_losses, val_classification_losses, val_domain_losses = [], [], []
+    max_distances = []
     
     print("Training Started!")
     
@@ -187,18 +189,22 @@ def train_model_da(model,
             
             target_inputs, _ = target_batch
             target_inputs = target_inputs.to(device).float()
-            
+
             features, outputs = model(inputs)
             target_features, _ = model(target_inputs)
             
             features = features.view(features.size(0), -1)
             target_features = target_features.view(target_features.size(0), -1)
             
+            distances = torch.norm(features - target_features, dim=1)
+            max_distance = torch.max(distances)
+            max_distances.append(max_distance.item())
+            
             if torch.isnan(features).any() or torch.isinf(features).any() or torch.isnan(target_features).any() or torch.isinf(target_features).any():
                 print("NaNs or Infinities detected in features!")
                     
             classification_loss = F.cross_entropy(outputs, targets)
-            domain_loss = sinkhorn_loss(features, target_features)
+            domain_loss = sinkhorn_loss(features, target_features, blur = 0.1 * max_distance)
             
             if dynamic_weighting:
                 loss = (1 / (2 * sigma_1**2)) * classification_loss + (0.1 / (2 * sigma_2**2)) * domain_loss + torch.log(sigma_1 * sigma_2)
@@ -229,6 +235,7 @@ def train_model_da(model,
         train_domain_losses.append(train_domain_loss)
         steps.append(epoch + 1)
         
+        print(f"Epoch: {epoch + 1}, Max Distance: {max_distance:.4f}")
         print(f"Epoch: {epoch + 1}, Train Loss: {train_loss:.4e}")
         print(f"Epoch: {epoch + 1}, Classification Loss: {train_classification_loss:.4e}, Domain Loss: {train_domain_loss:.4e}")
 
