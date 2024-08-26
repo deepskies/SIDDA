@@ -30,7 +30,7 @@ def load_models(directory_path, model_name='D4'):
     
     # Search for files that contain 'best_model' and end with '.pt' in their names
     for file_name in os.listdir(directory_path):
-        if 'best_model' in file_name and file_name.endswith('.pt'):
+        if file_name.endswith('.pt'):
             file_path = os.path.join(directory_path, file_name)
             print(f'Loading {model_name} from {file_path}...')
             
