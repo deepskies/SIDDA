@@ -276,11 +276,11 @@ def train_model_da(model,
             val_domain_losses.append(val_domain_loss)
             
             lr = scheduler.get_last_lr()[0] if scheduler is not None else optimizer.param_groups[0]['lr']
-            print(f"Epoch: {epoch + 1}, Validation Loss: {val_loss:.4f}, Accuracy: {val_acc:.2f}%, Learning rate: {lr}")
-            print(f"Epoch: {epoch + 1}, Classification Loss: {val_classification_loss:.4e}, Domain Loss: {val_domain_loss:.4e}")
+            print(f"Epoch: {epoch + 1}, Total Validation Loss: {val_loss:.4f}, Total Validation Accuracy: {val_acc:.2f}%, Learning rate: {lr}")
+            print(f"Epoch: {epoch + 1}, Validation Classification Loss: {val_classification_loss:.4e}, Validation Domain Loss: {val_domain_loss:.4e}")
 
             # Check and save the model with best validation accuracy
-            if val_acc > best_val_acc:
+            if val_acc >= best_val_acc:
                 best_val_acc = val_acc
                 best_val_epoch = epoch + 1
                 model_path = os.path.join(save_dir, "best_model_val_acc.pt")
@@ -291,7 +291,7 @@ def train_model_da(model,
                 print(f"Saved best validation accuracy model at epoch {best_val_epoch}")
 
             # Check and save the model with lowest classification loss
-            if val_classification_loss < best_classification_loss:
+            if val_classification_loss <= best_classification_loss:
                 best_classification_loss = val_classification_loss
                 best_classification_epoch = epoch + 1
                 model_path = os.path.join(save_dir, "best_model_classification_loss.pt")
@@ -302,7 +302,7 @@ def train_model_da(model,
                 print(f"Saved lowest classification loss model at epoch {best_classification_epoch}")
 
             # Check and save the model with lowest domain loss
-            if val_domain_loss < best_domain_loss:
+            if val_domain_loss <= best_domain_loss:
                 best_domain_loss = val_domain_loss
                 best_domain_epoch = epoch + 1
                 model_path = os.path.join(save_dir, "best_model_domain_loss.pt")
@@ -311,7 +311,6 @@ def train_model_da(model,
                 else:
                     torch.save(model.eval().state_dict(), model_path)
                 print(f"Saved lowest domain loss model at epoch {best_domain_epoch}")
-
 
             if no_improvement_count >= early_stopping_patience:
                 print(f"Early stopping after {early_stopping_patience} epochs without improvement in accuracy.")
