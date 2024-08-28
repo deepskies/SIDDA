@@ -246,7 +246,7 @@ def train_model_da(model,
 
         if (epoch + 1) % report_interval == 0:
             model.eval()
-            correct, total, val_loss = 0, 0, 0.0
+            source_correct, target_correct, total, val_loss = 0, 0, 0, 0.0
             val_classification_loss, val_domain_loss = 0.0, 0.0
 
             with torch.no_grad():
@@ -255,8 +255,10 @@ def train_model_da(model,
                     inputs, targets = inputs.to(device).float(), targets.to(device)
                     target_inputs, _ = target_batch
                     target_inputs = target_inputs.to(device).float()
-                    features, outputs = model(inputs)
-                    target_features, _ = model(target_inputs)
+                    
+                    features, source_outputs = model(inputs)
+                    target_features, target_outputs = model(target_inputs)
+                    
                     features = features.view(features.size(0), -1)
                     target_features = target_features.view(target_features.size(0), -1)
                     
@@ -272,11 +274,14 @@ def train_model_da(model,
                     val_classification_loss += classification_loss_.item()
                     val_domain_loss += domain_loss_.item()
                     
-                    _, predicted = torch.max(outputs.data, 1)
+                    _, source_predicted = torch.max(source_outputs.data, 1)
+                    _, target_predicted = torch.max(target_outputs.data, 1)
                     total += targets.size(0)
-                    correct += (predicted == targets).sum().item()
+                    source_correct += (source_predicted == targets).sum().item()
+                    target_correct += (target_predicted == targets).sum().item()
 
-            val_acc = 100 * correct / total
+            source_val_acc = 100 * source_correct / total
+            target_val_acc = 100 * target_correct / total
             val_loss /= len(val_dataloader)
             val_classification_loss /= len(val_dataloader)
             val_domain_loss /= len(val_dataloader)
@@ -285,12 +290,12 @@ def train_model_da(model,
             val_domain_losses.append(val_domain_loss)
             
             lr = scheduler.get_last_lr()[0] if scheduler is not None else optimizer.param_groups[0]['lr']
-            print(f"Epoch: {epoch + 1}, Total Validation Loss: {val_loss:.4f}, Total Validation Accuracy: {val_acc:.2f}%, Learning rate: {lr}")
+            print(f"Epoch: {epoch + 1}, Total Validation Loss: {val_loss:.4f}, Source Validation Accuracy: {source_val_acc:.2f}%, Learning rate: {lr}, Target Validation Accuracy: {target_val_acc:.2f}%")
             print(f"Epoch: {epoch + 1}, Validation Classification Loss: {val_classification_loss:.4e}, Validation Domain Loss: {val_domain_loss:.4e}")
 
             # Check and save the model with best validation accuracy
-            if val_acc >= best_val_acc:
-                best_val_acc = val_acc
+            if source_val_acc >= best_val_acc:
+                best_val_acc = source_val_acc
                 best_val_epoch = epoch + 1
                 model_path = os.path.join(save_dir, "best_model_val_acc.pt")
                 if torch.cuda.device_count() > 1:
