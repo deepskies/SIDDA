@@ -59,15 +59,14 @@ def compute_metrics(test_loader, model, model_name, save_dir, output_name):
     model.eval()
 
     for batch in tqdm(test_loader, unit="batch", total=len(test_loader)):
-        input, label = batch
-        input, label = input.to(device), label.to(device)
-        input = input.float()
-        features, outputs = model(input)
-        pred_labels = torch.argmax(outputs, dim=-1).cpu().numpy()
+        input, output = batch
+        input, label = input.to(device).float(), output.to(device)
+        features, preds = model(input)
+        _, predicted_class = torch.max(preds.data, 1)
         feature_maps.extend(features.cpu().numpy())
         
-        y_pred.extend(pred_labels)
-        y_true.extend(label.cpu().numpy())
+        y_pred.extend(predicted_class.cpu().numpy())
+        y_true.extend(output.cpu().numpy())
     
     y_pred, y_true = np.asarray(y_pred), np.asarray(y_true)
     feature_maps = np.asarray(feature_maps)
