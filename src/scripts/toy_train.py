@@ -246,24 +246,24 @@ def train_model_da(model,
 
         if (epoch + 1) % report_interval == 0:
             model.eval()
-            source_correct, target_correct, total, val_loss = 0, 0, 0, 0.0
+            source_correct, target_correct, source_total, target_total, val_loss = 0, 0, 0, 0, 0.0
             val_classification_loss, val_domain_loss = 0.0, 0.0
 
             with torch.no_grad():
                 for i, (batch, target_batch) in enumerate(zip(val_dataloader, target_val_dataloader)):
-                    inputs, targets = batch
-                    inputs, targets = inputs.to(device).float(), targets.to(device)
-                    target_inputs, _ = target_batch
-                    target_inputs = target_inputs.to(device).float()
+                    source_inputs, source_outputs = batch
+                    source_inputs, source_outputs = source_inputs.to(device).float(), source_outputs.to(device)
+                    target_inputs, target_outputs = target_batch
+                    target_inputs, target_outputs = target_inputs.to(device).float(), target_outputs.to(device)
+                
+                    source_features, source_preds = model(source_inputs)
+                    target_features, target_preds = model(target_inputs)
                     
-                    features, source_outputs = model(inputs)
-                    target_features, target_outputs = model(target_inputs)
-                    
-                    features = features.view(features.size(0), -1)
+                    source_features = source_features.view(source_features.size(0), -1)
                     target_features = target_features.view(target_features.size(0), -1)
                     
-                    classification_loss_ = F.cross_entropy(source_outputs, targets)
-                    domain_loss_ = sinkhorn_loss(features, target_features, blur = 0.1 * max_distance.detach().cpu().numpy(), reach = 0.1 * max_distance.detach().cpu().numpy())
+                    classification_loss_ = F.cross_entropy(source_preds, source_outputs)
+                    domain_loss_ = sinkhorn_loss(source_features, target_features, blur = 0.1 * max_distance.detach().cpu().numpy(), reach = 0.1 * max_distance.detach().cpu().numpy())
                     
                     if dynamic_weighting:
                         combined_loss = (1 / (2 * sigma_1**2)) * classification_loss_ + (1 / (2 * sigma_2**2)) * domain_loss_ + torch.log(sigma_1 * sigma_2)
@@ -274,14 +274,15 @@ def train_model_da(model,
                     val_classification_loss += classification_loss_.item()
                     val_domain_loss += domain_loss_.item()
                     
-                    _, source_predicted = torch.max(source_outputs.data, 1)
-                    _, target_predicted = torch.max(target_outputs.data, 1)
-                    total += targets.size(0)
-                    source_correct += (source_predicted == targets).sum().item()
-                    target_correct += (target_predicted == targets).sum().item()
+                    _, source_predicted = torch.max(source_preds.data, 1)
+                    _, target_predicted = torch.max(target_preds.data, 1)
+                    source_total += source_outputs.size(0)
+                    target_total += target_outputs.size(0)
+                    source_correct += (source_predicted == source_outputs).sum().item()
+                    target_correct += (target_predicted == target_outputs).sum().item()
 
-            source_val_acc = 100 * source_correct / total
-            target_val_acc = 100 * target_correct / total
+            source_val_acc = 100 * source_correct / source_total
+            target_val_acc = 100 * target_correct / target_total
             val_loss /= len(val_dataloader)
             val_classification_loss /= len(val_dataloader)
             val_domain_loss /= len(val_dataloader)
