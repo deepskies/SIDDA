@@ -19,9 +19,10 @@ import geomloss
 
 def sinkhorn_loss(x, 
                   y,
-                  blur
+                  blur,
+                  reach
             ):
-    loss = geomloss.SamplesLoss(loss=config['DA_metric'], blur = blur, scaling = config['parameters']['scaling'])
+    loss = geomloss.SamplesLoss(loss=config['DA_metric'], blur = blur, scaling = config['parameters']['scaling'], reach = reach)
     return loss(x, y)
 
 
@@ -204,7 +205,7 @@ def train_model_da(model,
                 print("NaNs or Infinities detected in features!")
                     
             classification_loss = F.cross_entropy(outputs, targets)
-            domain_loss = sinkhorn_loss(features, target_features, blur = 0.1 * max_distance.detach().cpu().numpy())
+            domain_loss = sinkhorn_loss(features, target_features, blur = 0.1 * max_distance.detach().cpu().numpy(), reach = 0.1 * max_distance.detach().cpu().numpy())
             
             if dynamic_weighting:
                 loss = (1 / (2 * sigma_1**2)) * classification_loss + (0.1 / (2 * sigma_2**2)) * domain_loss + torch.log(sigma_1 * sigma_2)
@@ -235,6 +236,7 @@ def train_model_da(model,
         train_domain_losses.append(train_domain_loss)
         steps.append(epoch + 1)
         
+        print(f"Epoch: {epoch + 1}, sigma_1: {sigma_1.item():.4f}, sigma_2: {sigma_2.item():.4f}")
         print(f"Epoch: {epoch + 1}, Max Distance: {max_distance:.4f}")
         print(f"Epoch: {epoch + 1}, Train Loss: {train_loss:.4e}")
         print(f"Epoch: {epoch + 1}, Classification Loss: {train_classification_loss:.4e}, Domain Loss: {train_domain_loss:.4e}")
