@@ -262,7 +262,7 @@ def train_model_da(model,
                     features = features.view(features.size(0), -1)
                     target_features = target_features.view(target_features.size(0), -1)
                     
-                    classification_loss_ = F.cross_entropy(outputs, targets)
+                    classification_loss_ = F.cross_entropy(source_outputs, targets)
                     domain_loss_ = sinkhorn_loss(features, target_features, blur = 0.1 * max_distance.detach().cpu().numpy(), reach = 0.1 * max_distance.detach().cpu().numpy())
                     
                     if dynamic_weighting:
