@@ -179,7 +179,8 @@ def train_model_da(model,
         sigma_2 = torch.nn.Parameter(torch.tensor(1.1, device=device))  # Start with sigma_2 slightly larger
 
         optimizer.add_param_group({'params': [sigma_1, sigma_2]})
-            
+    
+    warmup = 30
     for epoch in range(epochs):
         model.train()
         train_loss = 0.0
@@ -208,11 +209,14 @@ def train_model_da(model,
             classification_loss = F.cross_entropy(outputs, targets)
             domain_loss = sinkhorn_loss(features, target_features, blur = 0.1 * max_distance.detach().cpu().numpy(), reach = None)
             
-            if dynamic_weighting:
-                loss = (1 / (2 * sigma_1**2)) * classification_loss + (0.1 / (2 * sigma_2**2)) * domain_loss + torch.log(sigma_1 * sigma_2)
-            
-            else:        
-                loss = classification_loss + scale_factor * domain_loss
+            if epoch < warmup:
+                loss = classification_loss
+            else:
+                if dynamic_weighting:
+                    loss = (1 / (2 * sigma_1**2)) * classification_loss + (1 / (2 * sigma_2**2)) * domain_loss + torch.log(sigma_1 * sigma_2)
+                
+                else:        
+                    loss = classification_loss + scale_factor * domain_loss
             
             optimizer.zero_grad()
             loss.backward()
@@ -222,7 +226,7 @@ def train_model_da(model,
             if dynamic_weighting:
                 with torch.no_grad():
                     sigma_1.clamp_(min=1e-3, max=2.0)
-                    sigma_2.clamp_(min=sigma_1.data + 0.1, max=2.0)  # Enforce sigma_2 > sigma_1 by a small margin
+                    sigma_2.clamp_(min=1e-3, max=2.0)  # Enforce sigma_2 > sigma_1 by a small margin
 
 
             train_loss += loss.item()
@@ -267,10 +271,13 @@ def train_model_da(model,
                     classification_loss_ = F.cross_entropy(source_preds, source_outputs)
                     domain_loss_ = sinkhorn_loss(source_features, target_features, blur = 0.1 * max_distance.detach().cpu().numpy(), reach = 0.1 * max_distance.detach().cpu().numpy())
                     
-                    if dynamic_weighting:
-                        combined_loss = (1 / (2 * sigma_1**2)) * classification_loss_ + (1 / (2 * sigma_2**2)) * domain_loss_ + torch.log(sigma_1 * sigma_2)
+                    if epoch < warmup:
+                        combined_loss = classification_loss_
                     else:
-                        combined_loss = classification_loss_ + scale_factor * domain_loss_
+                        if dynamic_weighting:
+                            combined_loss = (1 / (2 * sigma_1**2)) * classification_loss_ + (1 / (2 * sigma_2**2)) * domain_loss_ + torch.log(sigma_1 * sigma_2)
+                        else:
+                            combined_loss = classification_loss_ + scale_factor * domain_loss_
                     
                     val_loss += combined_loss.item()
                     val_classification_loss += classification_loss_.item()
