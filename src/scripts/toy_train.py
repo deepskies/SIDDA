@@ -311,13 +311,18 @@ def train_model_da(model,
                     source_correct += (source_predicted == source_outputs).sum().item()
 
             source_val_acc = 100 * source_correct / source_total
-            target_val_acc = 100 * target_correct / target_total
+
+            if target_total > 0:
+                target_val_acc = 100 * target_correct / target_total
+            else:
+                target_val_acc = 0.0  # Or skip this calculation entirely during warmup
+
             val_loss /= len(val_dataloader)
             val_classification_loss /= len(val_dataloader)
-            
+
             if epoch >= warmup:
                 val_domain_loss /= len(val_dataloader)  # Normalize domain loss only if accumulated
-            
+
             val_losses.append(val_loss)
             val_classification_losses.append(val_classification_loss)
             val_domain_losses.append(val_domain_loss)
