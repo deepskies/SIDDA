@@ -128,6 +128,8 @@ class ConvNet(nn.Module):
         self.fc1 = nn.Linear(in_features=32 * 12 * 12, out_features=256)
         self.fc1.weight.data.normal_(0, .005)
         self.fc1.bias.data.fill_(0.0)
+        self.dropout_fc = nn.Dropout(p=0.2)
+        self.layer_norm = nn.LayerNorm(256)
         
         # Output Layer (Fully Connected)
         self.fc2 = nn.Linear(in_features=256, out_features=num_classes)
@@ -151,8 +153,9 @@ class ConvNet(nn.Module):
         x = x.view(-1, 32 * 12 * 12)
         
         # Bottleneck Layer
-        x = self.fc1(x)
-        latent_space = x
+        x = self.dropout_fc(self.fc1(x))
+        x = self.layer_norm(x)
+        latent_space = F.sigmoid(x)
         
         # Output Layer
         x = self.fc2(x)
