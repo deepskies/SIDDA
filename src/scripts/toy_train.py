@@ -232,7 +232,8 @@ def train_model_da(model,
             
             train_loss += loss.item()
             classification_losses.append(classification_loss.item())
-            domain_losses.append(domain_loss.item())
+            if epoch >= warmup:
+                domain_losses.append(domain_loss.item())
             
         train_loss /= len(train_dataloader)
         train_classification_loss = np.mean(classification_losses)
