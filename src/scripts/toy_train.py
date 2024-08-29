@@ -185,21 +185,21 @@ def train_model_da(model,
         model.train()
         train_loss = 0.0
         classification_losses, domain_losses = [], []
-     
+
         for i, (batch, target_batch) in tqdm(enumerate(zip(train_dataloader, target_dataloader))):
             inputs, targets = batch
             inputs, targets = inputs.to(device).float(), targets.to(device)
-            
+
             target_inputs, _ = target_batch
             target_inputs = target_inputs.to(device).float()
-            
+
             optimizer.zero_grad()
-            
+
             if epoch < warmup:
                 _, outputs = model(inputs)
                 classification_loss = F.cross_entropy(outputs, targets)
                 loss = classification_loss
-                
+                domain_loss = None  # No domain loss during warmup
             else:
                 features, outputs = model(inputs)
                 target_features, _ = model(target_inputs)
@@ -208,52 +208,58 @@ def train_model_da(model,
                 distances = torch.norm(features - target_features, dim=1)
                 max_distance = torch.max(distances)
                 max_distances.append(max_distance.item())
-                
+
                 if torch.isnan(features).any() or torch.isinf(features).any() or torch.isnan(target_features).any() or torch.isinf(target_features).any():
                     print("NaNs or Infinities detected in features!")
-                    
+
                 classification_loss = F.cross_entropy(outputs, targets)
-                domain_loss = sinkhorn_loss(features, target_features, blur = 0.1 * max_distance.detach().cpu().numpy(), reach = None)
-                
+                domain_loss = sinkhorn_loss(features, target_features, blur=0.1 * max_distance.detach().cpu().numpy(), reach=None)
+
                 if dynamic_weighting:
                     loss = (1 / (2 * sigma_1**2)) * classification_loss + (1 / (2 * sigma_2**2)) * domain_loss + torch.log(sigma_1 * sigma_2)
-                    
                 else:
                     loss = classification_loss + scale_factor * domain_loss
-                    
+
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=10.0)
             optimizer.step()
-            
-            if epoch > warmup and dynamic_weighting:
+
+            if epoch >= warmup and dynamic_weighting:
                 with torch.no_grad():
                     sigma_1.clamp_(min=1e-3, max=2.0)
                     sigma_2.clamp_(min=1e-3, max=2.0)
-            
+
             train_loss += loss.item()
             classification_losses.append(classification_loss.item())
             if epoch >= warmup:
                 domain_losses.append(domain_loss.item())
-            
+
         train_loss /= len(train_dataloader)
         train_classification_loss = np.mean(classification_losses)
-        train_domain_loss = np.mean(domain_losses)
-        
+        train_domain_loss = np.mean(domain_losses) if domain_losses else None
+
         losses.append(train_loss)
         train_classification_losses.append(train_classification_loss)
         train_domain_losses.append(train_domain_loss)
         steps.append(epoch + 1)
-        
-        if dynamic_weighting:
+
+        # Dynamic weighting logging only after warmup
+        if epoch >= warmup and dynamic_weighting:
             print(f"Epoch: {epoch + 1}, sigma_1: {sigma_1.item():.4f}, sigma_2: {sigma_2.item():.4f}")
             print(f"Epoch: {epoch + 1}, Max Distance: {max_distance:.4f}")
-            
-        print(f"Epoch: {epoch + 1}, Train Loss: {train_loss:.4e}")
-        print(f"Epoch: {epoch + 1}, Classification Loss: {train_classification_loss:.4e}, Domain Loss: {train_domain_loss:.4e}")
+
+        # Adjust logging based on warmup phase
+        if epoch < warmup:
+            print(f"Epoch: {epoch + 1}, Train Loss: {train_loss:.4e}")
+            print(f"Epoch: {epoch + 1}, Classification Loss: {train_classification_loss:.4e}")
+        else:
+            print(f"Epoch: {epoch + 1}, Train Loss: {train_loss:.4e}")
+            print(f"Epoch: {epoch + 1}, Classification Loss: {train_classification_loss:.4e}, Domain Loss: {train_domain_loss:.4e}")
 
         if scheduler is not None:
             scheduler.step()
 
+        # Validation and logging
         if (epoch + 1) % report_interval == 0:
             model.eval()
             source_correct, target_correct, source_total, target_total, val_loss = 0, 0, 0, 0, 0.0
@@ -265,16 +271,16 @@ def train_model_da(model,
                     source_inputs, source_outputs = source_inputs.to(device).float(), source_outputs.to(device)
                     target_inputs, target_outputs = target_batch
                     target_inputs, target_outputs = target_inputs.to(device).float(), target_outputs.to(device)
-                
+
                     source_features, source_preds = model(source_inputs)
                     target_features, target_preds = model(target_inputs)
-                    
+
                     source_features = source_features.view(source_features.size(0), -1)
                     target_features = target_features.view(target_features.size(0), -1)
-                    
+
                     classification_loss_ = F.cross_entropy(source_preds, source_outputs)
-                    domain_loss_ = sinkhorn_loss(source_features, target_features, blur = 0.1 * max_distance.detach().cpu().numpy(), reach = 0.1 * max_distance.detach().cpu().numpy())
-                    
+                    domain_loss_ = sinkhorn_loss(source_features, target_features, blur=0.1 * max_distance.detach().cpu().numpy(), reach=0.1 * max_distance.detach().cpu().numpy())
+
                     if epoch < warmup:
                         combined_loss = classification_loss_
                     else:
@@ -282,11 +288,11 @@ def train_model_da(model,
                             combined_loss = (1 / (2 * sigma_1**2)) * classification_loss_ + (1 / (2 * sigma_2**2)) * domain_loss_ + torch.log(sigma_1 * sigma_2)
                         else:
                             combined_loss = classification_loss_ + scale_factor * domain_loss_
-                    
+
                     val_loss += combined_loss.item()
                     val_classification_loss += classification_loss_.item()
                     val_domain_loss += domain_loss_.item()
-                    
+
                     _, source_predicted = torch.max(source_preds.data, 1)
                     _, target_predicted = torch.max(target_preds.data, 1)
                     source_total += source_outputs.size(0)
@@ -302,10 +308,16 @@ def train_model_da(model,
             val_losses.append(val_loss)
             val_classification_losses.append(val_classification_loss)
             val_domain_losses.append(val_domain_loss)
-            
+
             lr = scheduler.get_last_lr()[0] if scheduler is not None else optimizer.param_groups[0]['lr']
-            print(f"Epoch: {epoch + 1}, Total Validation Loss: {val_loss:.4f}, Source Validation Accuracy: {source_val_acc:.2f}%, Learning rate: {lr}, Target Validation Accuracy: {target_val_acc:.2f}%")
-            print(f"Epoch: {epoch + 1}, Validation Classification Loss: {val_classification_loss:.4e}, Validation Domain Loss: {val_domain_loss:.4e}")
+            
+            # Adjust validation logging based on warmup phase
+            if epoch < warmup:
+                print(f"Epoch: {epoch + 1}, Total Validation Loss: {val_loss:.4f}, Source Validation Accuracy: {source_val_acc:.2f}%, Learning rate: {lr}")
+                print(f"Epoch: {epoch + 1}, Validation Classification Loss: {val_classification_loss:.4e}")
+            else:
+                print(f"Epoch: {epoch + 1}, Total Validation Loss: {val_loss:.4f}, Source Validation Accuracy: {source_val_acc:.2f}%, Learning rate: {lr}, Target Validation Accuracy: {target_val_acc:.2f}%")
+                print(f"Epoch: {epoch + 1}, Validation Classification Loss: {val_classification_loss:.4e}, Validation Domain Loss: {val_domain_loss:.4e}")
 
             # Check and save the model with best validation accuracy
             if source_val_acc >= best_val_acc:
