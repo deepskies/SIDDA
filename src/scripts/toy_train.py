@@ -164,6 +164,7 @@ def train_model_da(model,
     else:
         model.to(device)
     
+    warmup = 30
     print("Model Loaded to Device!")
     best_val_acc, best_classification_loss, best_domain_loss = 0, float('inf'), float('inf')
     no_improvement_count = 0
@@ -180,7 +181,6 @@ def train_model_da(model,
 
         optimizer.add_param_group({'params': [sigma_1, sigma_2]})
     
-    warmup = 30
     for epoch in range(epochs):
         model.train()
         train_loss = 0.0
@@ -192,7 +192,8 @@ def train_model_da(model,
             
             target_inputs, _ = target_batch
             target_inputs = target_inputs.to(device).float()
-
+            
+            optimizer.zero_grad()
             features, outputs = model(inputs)
             target_features, _ = model(target_inputs)
             
@@ -218,7 +219,6 @@ def train_model_da(model,
                 else:        
                     loss = classification_loss + scale_factor * domain_loss
             
-            optimizer.zero_grad()
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer.step()
@@ -242,8 +242,10 @@ def train_model_da(model,
         train_domain_losses.append(train_domain_loss)
         steps.append(epoch + 1)
         
-        print(f"Epoch: {epoch + 1}, sigma_1: {sigma_1.item():.4f}, sigma_2: {sigma_2.item():.4f}")
-        print(f"Epoch: {epoch + 1}, Max Distance: {max_distance:.4f}")
+        if dynamic_weighting:
+            print(f"Epoch: {epoch + 1}, sigma_1: {sigma_1.item():.4f}, sigma_2: {sigma_2.item():.4f}")
+            print(f"Epoch: {epoch + 1}, Max Distance: {max_distance:.4f}")
+            
         print(f"Epoch: {epoch + 1}, Train Loss: {train_loss:.4e}")
         print(f"Epoch: {epoch + 1}, Classification Loss: {train_classification_loss:.4e}, Domain Loss: {train_domain_loss:.4e}")
 
