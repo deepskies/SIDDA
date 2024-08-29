@@ -259,7 +259,6 @@ def train_model_da(model,
         if scheduler is not None:
             scheduler.step()
 
-        # Validation and logging
         if (epoch + 1) % report_interval == 0:
             model.eval()
             source_correct, target_correct, source_total, target_total, val_loss = 0, 0, 0, 0, 0.0
@@ -272,18 +271,21 @@ def train_model_da(model,
                     target_inputs, target_outputs = target_batch
                     target_inputs, target_outputs = target_inputs.to(device).float(), target_outputs.to(device)
 
-                    source_features, source_preds = model(source_inputs)
-                    target_features, target_preds = model(target_inputs)
-
-                    source_features = source_features.view(source_features.size(0), -1)
-                    target_features = target_features.view(target_features.size(0), -1)
-
-                    classification_loss_ = F.cross_entropy(source_preds, source_outputs)
-                    domain_loss_ = sinkhorn_loss(source_features, target_features, blur=0.1 * max_distance.detach().cpu().numpy(), reach=0.1 * max_distance.detach().cpu().numpy())
-
                     if epoch < warmup:
+                        _, source_preds = model(source_inputs)
+                        classification_loss_ = F.cross_entropy(source_preds, source_outputs)
                         combined_loss = classification_loss_
+                        domain_loss_ = 0.0  # Set to zero explicitly
                     else:
+                        source_features, source_preds = model(source_inputs)
+                        target_features, target_preds = model(target_inputs)
+
+                        source_features = source_features.view(source_features.size(0), -1)
+                        target_features = target_features.view(target_features.size(0), -1)
+
+                        classification_loss_ = F.cross_entropy(source_preds, source_outputs)
+                        domain_loss_ = sinkhorn_loss(source_features, target_features, blur=0.1 * max_distance.detach().cpu().numpy(), reach=0.1 * max_distance.detach().cpu().numpy())
+
                         if dynamic_weighting:
                             combined_loss = (1 / (2 * sigma_1**2)) * classification_loss_ + (1 / (2 * sigma_2**2)) * domain_loss_ + torch.log(sigma_1 * sigma_2)
                         else:
@@ -291,7 +293,9 @@ def train_model_da(model,
 
                     val_loss += combined_loss.item()
                     val_classification_loss += classification_loss_.item()
-                    val_domain_loss += domain_loss_.item()
+
+                    if epoch >= warmup:
+                        val_domain_loss += domain_loss_.item()  # Accumulate domain loss only post-warmup
 
                     _, source_predicted = torch.max(source_preds.data, 1)
                     _, target_predicted = torch.max(target_preds.data, 1)
@@ -304,13 +308,16 @@ def train_model_da(model,
             target_val_acc = 100 * target_correct / target_total
             val_loss /= len(val_dataloader)
             val_classification_loss /= len(val_dataloader)
-            val_domain_loss /= len(val_dataloader)
+            
+            if epoch >= warmup:
+                val_domain_loss /= len(val_dataloader)  # Normalize domain loss only if accumulated
+            
             val_losses.append(val_loss)
             val_classification_losses.append(val_classification_loss)
             val_domain_losses.append(val_domain_loss)
 
             lr = scheduler.get_last_lr()[0] if scheduler is not None else optimizer.param_groups[0]['lr']
-            
+
             # Adjust validation logging based on warmup phase
             if epoch < warmup:
                 print(f"Epoch: {epoch + 1}, Total Validation Loss: {val_loss:.4f}, Source Validation Accuracy: {source_val_acc:.2f}%, Learning rate: {lr}")
@@ -318,7 +325,6 @@ def train_model_da(model,
             else:
                 print(f"Epoch: {epoch + 1}, Total Validation Loss: {val_loss:.4f}, Source Validation Accuracy: {source_val_acc:.2f}%, Learning rate: {lr}, Target Validation Accuracy: {target_val_acc:.2f}%")
                 print(f"Epoch: {epoch + 1}, Validation Classification Loss: {val_classification_loss:.4e}, Validation Domain Loss: {val_domain_loss:.4e}")
-
             # Check and save the model with best validation accuracy
             if source_val_acc >= best_val_acc:
                 best_val_acc = source_val_acc
