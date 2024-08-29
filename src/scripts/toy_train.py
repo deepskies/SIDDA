@@ -464,7 +464,7 @@ def main(config):
         # Load target dataset
         target_dataset = Shapes(input_path=config['train_data']['target_input_path'], 
                                 output_path=config['train_data']['target_output_path'], 
-                                transform=val_transform)
+                                transform=train_transform)
         
         # Split target dataset into train and validation sets
         target_dataset, val_target_dataset = split_dataset(target_dataset, 
