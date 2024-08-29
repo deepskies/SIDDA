@@ -164,7 +164,7 @@ def train_model_da(model,
     else:
         model.to(device)
     
-    warmup = 30
+    warmup = 10
     print("Model Loaded to Device!")
     best_val_acc, best_classification_loss, best_domain_loss = 0, float('inf'), float('inf')
     no_improvement_count = 0
@@ -218,6 +218,7 @@ def train_model_da(model,
                 if dynamic_weighting:
                     loss = (1 / (2 * sigma_1**2)) * classification_loss + (1 / (2 * sigma_2**2)) * domain_loss + torch.log(sigma_1 * sigma_2)
                 else:
+                    scale_factor = 0.1 * (classification_loss.item() / domain_loss.item())
                     loss = classification_loss + scale_factor * domain_loss
 
             loss.backward()
