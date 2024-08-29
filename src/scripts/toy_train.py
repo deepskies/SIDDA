@@ -176,7 +176,8 @@ def train_model_da(model,
     
     if dynamic_weighting:
         sigma_1 = torch.nn.Parameter(torch.tensor(1.0, device=device))
-        sigma_2 = torch.nn.Parameter(torch.tensor(1.0, device=device))
+        sigma_2 = torch.nn.Parameter(torch.tensor(1.1, device=device))  # Start with sigma_2 slightly larger
+
         optimizer.add_param_group({'params': [sigma_1, sigma_2]})
             
     for epoch in range(epochs):
@@ -205,7 +206,7 @@ def train_model_da(model,
                 print("NaNs or Infinities detected in features!")
                     
             classification_loss = F.cross_entropy(outputs, targets)
-            domain_loss = sinkhorn_loss(features, target_features, blur = 0.1 * max_distance.detach().cpu().numpy(), reach = 0.1 * max_distance.detach().cpu().numpy())
+            domain_loss = sinkhorn_loss(features, target_features, blur = 0.1 * max_distance.detach().cpu().numpy(), reach = None)
             
             if dynamic_weighting:
                 loss = (1 / (2 * sigma_1**2)) * classification_loss + (0.1 / (2 * sigma_2**2)) * domain_loss + torch.log(sigma_1 * sigma_2)
@@ -219,9 +220,10 @@ def train_model_da(model,
             optimizer.step()
             
             if dynamic_weighting:
-                    with torch.no_grad():
-                        sigma_1.clamp_(min=1e-3, max = 2.0)
-                        sigma_2.clamp_(min=1e-3, max = 2.0)
+                with torch.no_grad():
+                    sigma_1.clamp_(min=1e-3, max=2.0)
+                    sigma_2.clamp_(min=sigma_1.data + 0.1, max=2.0)  # Enforce sigma_2 > sigma_1 by a small margin
+
 
             train_loss += loss.item()
             classification_losses.append(classification_loss.item())
