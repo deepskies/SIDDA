@@ -194,45 +194,46 @@ def train_model_da(model,
             target_inputs = target_inputs.to(device).float()
             
             optimizer.zero_grad()
-            features, outputs = model(inputs)
-            target_features, _ = model(target_inputs)
-            
-            features = features.view(features.size(0), -1)
-            target_features = target_features.view(target_features.size(0), -1)
-            
-            distances = torch.norm(features - target_features, dim=1)
-            max_distance = torch.max(distances)
-            max_distances.append(max_distance.item())
-            
-            if torch.isnan(features).any() or torch.isinf(features).any() or torch.isnan(target_features).any() or torch.isinf(target_features).any():
-                print("NaNs or Infinities detected in features!")
-                    
-            classification_loss = F.cross_entropy(outputs, targets)
-            domain_loss = sinkhorn_loss(features, target_features, blur = 0.1 * max_distance.detach().cpu().numpy(), reach = None)
             
             if epoch < warmup:
+                _, outputs = model(inputs)
+                classification_loss = F.cross_entropy(outputs, targets)
                 loss = classification_loss
+                
             else:
+                features, outputs = model(inputs)
+                target_features, _ = model(target_inputs)
+                features = features.view(features.size(0), -1)
+                target_features = target_features.view(target_features.size(0), -1)
+                distances = torch.norm(features - target_features, dim=1)
+                max_distance = torch.max(distances)
+                max_distances.append(max_distance.item())
+                
+                if torch.isnan(features).any() or torch.isinf(features).any() or torch.isnan(target_features).any() or torch.isinf(target_features).any():
+                    print("NaNs or Infinities detected in features!")
+                    
+                classification_loss = F.cross_entropy(outputs, targets)
+                domain_loss = sinkhorn_loss(features, target_features, blur = 0.1 * max_distance.detach().cpu().numpy(), reach = None)
+                
                 if dynamic_weighting:
                     loss = (1 / (2 * sigma_1**2)) * classification_loss + (1 / (2 * sigma_2**2)) * domain_loss + torch.log(sigma_1 * sigma_2)
-                
-                else:        
+                    
+                else:
                     loss = classification_loss + scale_factor * domain_loss
-            
+                    
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=10.0)
             optimizer.step()
             
-            if dynamic_weighting:
+            if epoch > warmup and dynamic_weighting:
                 with torch.no_grad():
                     sigma_1.clamp_(min=1e-3, max=2.0)
-                    sigma_2.clamp_(min=1e-3, max=2.0)  # Enforce sigma_2 > sigma_1 by a small margin
-
-
+                    sigma_2.clamp_(min=1e-3, max=2.0)
+            
             train_loss += loss.item()
             classification_losses.append(classification_loss.item())
             domain_losses.append(domain_loss.item())
-
+            
         train_loss /= len(train_dataloader)
         train_classification_loss = np.mean(classification_losses)
         train_domain_loss = np.mean(domain_losses)
