@@ -275,8 +275,8 @@ def train_model_da(model,
                         _, source_preds = model(source_inputs)
                         classification_loss_ = F.cross_entropy(source_preds, source_outputs)
                         combined_loss = classification_loss_
-                        domain_loss_ = 0.0
-                        target_preds = None  # Initialize target_preds to None or skip operations involving target_preds
+                        domain_loss_ = 0.0  # Set to zero explicitly during warmup
+                        target_preds = None  # No target predictions during warmup
 
                     else:
                         source_features, source_preds = model(source_inputs)
@@ -293,18 +293,22 @@ def train_model_da(model,
                         else:
                             combined_loss = classification_loss_ + scale_factor * domain_loss_
 
+                        # Calculate target predictions only after warmup
+                        _, target_predicted = torch.max(target_preds.data, 1)
+                        target_total += target_outputs.size(0)
+                        target_correct += (target_predicted == target_outputs).sum().item()
+
+                    # Common operations for both phases
                     val_loss += combined_loss.item()
                     val_classification_loss += classification_loss_.item()
 
                     if epoch >= warmup:
-                        val_domain_loss += domain_loss_.item()  # Accumulate domain loss only post-warmup
+                        val_domain_loss += domain_loss_.item()  # Accumulate domain loss only after warmup
 
+                    # These lines should remain unchanged
                     _, source_predicted = torch.max(source_preds.data, 1)
-                    _, target_predicted = torch.max(target_preds.data, 1)
                     source_total += source_outputs.size(0)
-                    target_total += target_outputs.size(0)
                     source_correct += (source_predicted == source_outputs).sum().item()
-                    target_correct += (target_predicted == target_outputs).sum().item()
 
             source_val_acc = 100 * source_correct / source_total
             target_val_acc = 100 * target_correct / target_total
