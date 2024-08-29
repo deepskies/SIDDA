@@ -275,7 +275,9 @@ def train_model_da(model,
                         _, source_preds = model(source_inputs)
                         classification_loss_ = F.cross_entropy(source_preds, source_outputs)
                         combined_loss = classification_loss_
-                        domain_loss_ = 0.0  # Set to zero explicitly
+                        domain_loss_ = 0.0
+                        target_preds = None  # Initialize target_preds to None or skip operations involving target_preds
+
                     else:
                         source_features, source_preds = model(source_inputs)
                         target_features, target_preds = model(target_inputs)
