@@ -201,34 +201,36 @@ def train_model_da(model,
                 loss = classification_loss
                 domain_loss = None  # No domain loss during warmup
             else:
-                features, outputs = model(inputs)
-                target_features, _ = model(target_inputs)
-                features = features.view(features.size(0), -1)
-                target_features = target_features.view(target_features.size(0), -1)
-                distances = torch.norm(features - target_features, dim=1)
+                # Concatenate inputs for a single forward pass
+                concatenated_inputs = torch.cat((inputs, target_inputs), dim=0)
+                batch_size = inputs.size(0)
+
+                # Forward pass with concatenated inputs
+                features, outputs = model(concatenated_inputs)
+
+                # Split the features and outputs back into original and target
+                source_features = features[:batch_size]
+                target_features = features[batch_size:]
+                source_outputs = outputs[:batch_size]
+
+                # Compute classification loss on the original data
+                classification_loss = F.cross_entropy(source_outputs, targets)
+
+                # Compute domain loss between original and target features
+                distances = torch.norm(source_features - target_features, dim=1)
                 max_distance = torch.max(distances)
                 max_distances.append(max_distance.item())
+                domain_loss = sinkhorn_loss(source_features, target_features, blur=0.1 * max_distance.detach().cpu().numpy(), reach=None)
 
-                if torch.isnan(features).any() or torch.isinf(features).any() or torch.isnan(target_features).any() or torch.isinf(target_features).any():
-                    print("NaNs or Infinities detected in features!")
-
-                classification_loss = F.cross_entropy(outputs, targets)
-                domain_loss = sinkhorn_loss(features, target_features, blur=0.05, reach=None)
-
+                # Combine the losses
                 if dynamic_weighting:
                     loss = (1 / (2 * sigma_1**2)) * classification_loss + (1 / (2 * sigma_2**2)) * domain_loss + torch.log(sigma_1 * sigma_2)
                 else:
-                    scale_factor = 0.1 * (classification_loss.item() / domain_loss.item())
                     loss = classification_loss + scale_factor * domain_loss
 
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=10.0)
             optimizer.step()
-
-            if epoch >= warmup and dynamic_weighting:
-                with torch.no_grad():
-                    sigma_1.clamp_(min=1e-3, max=2.0)
-                    sigma_2.clamp_(min=1e-3, max=2.0)
 
             train_loss += loss.item()
             classification_losses.append(classification_loss.item())
