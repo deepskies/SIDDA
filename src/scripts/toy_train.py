@@ -428,6 +428,10 @@ def train_model_da(model,
     plt.plot(steps, losses, label='Train Total Loss')
     plt.plot(steps, train_classification_losses, label='Train Classification Loss')
     plt.plot(steps, train_domain_losses, label='Train Domain Loss')
+    plt.axvline(x=best_val_epoch, color='b', linestyle='--', label='Best Val Epoch')
+    plt.axvline(x=best_classification_epoch, color='y', linestyle='--', label='Best Classification Epoch')
+    plt.axvline(x=best_domain_epoch, color='g', linestyle='--', label='Best Domain Epoch')
+    plt.legend()
     plt.xlabel('Epochs')
     plt.ylabel('Loss')
     plt.title('Training Losses')
@@ -447,7 +451,39 @@ def train_model_da(model,
 
     plt.tight_layout()
     plt.savefig(os.path.join(loss_dir, f"losses_plot-{model_name}.png"))
-    plt.show()
+    plt.close()
+    
+    plt.figure(figsize=(10, 5))
+    
+    plt.plot(steps, max_distances)
+    plt.axvline(x=best_val_epoch, color='b', linestyle='--', label='Best Val Epoch')
+    plt.axvline(x=best_classification_epoch, color='y', linestyle='--', label='Best Classification Epoch')
+    plt.axvline(x=best_domain_epoch, color='g', linestyle='--', label='Best Domain Epoch')
+    plt.legend()
+    plt.xlabel('Epochs')
+    plt.ylabel('Max Distance')
+    plt.title('Max Distance vs. Training Steps')
+    plt.yscale('log')
+    plt.tight_layout()
+    plt.savefig(os.path.join(loss_dir, f"max_distance_plot-{model_name}.png"))
+    plt.close()
+    
+    plt.figure(figsize=(10, 5))
+    
+    plt.plot(steps, blur_vals)
+    plt.axhline(y=0.01, color='r', linestyle='--')
+    plt.axhline(y=0.05, color='g', linestyle='--')
+    plt.axvline(x=best_val_epoch, color='b', linestyle='--', label='Best Val Epoch')
+    plt.axvline(x=best_classification_epoch, color='y', linestyle='--', label='Best Classification Epoch')
+    plt.axvline(x=best_domain_epoch, color='g', linestyle='--', label='Best Domain Epoch')
+    plt.legend()
+    plt.xlabel('Epochs')
+    plt.ylabel('Blur Value')
+    plt.title('Blur Value vs. Training Steps')
+    plt.yscale('log')
+    plt.tight_layout()
+    plt.savefig(os.path.join(loss_dir, f"blur_value_plot-{model_name}.png"))
+    plt.close()
 
     return best_val_epoch, best_val_acc, best_classification_epoch, best_classification_loss, best_domain_epoch, best_domain_loss, losses[-1]
 
