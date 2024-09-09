@@ -295,8 +295,13 @@ def train_model_da(model,
                         target_features = target_features.view(target_features.size(0), -1)
 
                         classification_loss_ = F.cross_entropy(source_preds, source_outputs)
-                        domain_loss_ = sinkhorn_loss(source_features, target_features, blur=0.1 * max_distance.detach().cpu().numpy(), reach=None)
-
+                        domain_loss_ = sinkhorn_loss(source_features, 
+                                                     target_features, 
+                                                     blur=0.1 * max_distance.detach().cpu().numpy(), 
+                                                     scaling=config['parameters']['scaling'], 
+                                                     reach=None
+                                                )
+                        
                         if dynamic_weighting:
                             combined_loss = (1 / (2 * sigma_1**2)) * classification_loss_ + (1 / (2 * sigma_2**2)) * domain_loss_ + torch.log(sigma_1 * sigma_2)
                         else:
