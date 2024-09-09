@@ -20,9 +20,15 @@ import geomloss
 def sinkhorn_loss(x, 
                   y,
                   blur,
+                  scaling,
                   reach
             ):
-    loss = geomloss.SamplesLoss(loss=config['DA_metric'], blur = blur, scaling = config['parameters']['scaling'], reach = reach)
+    
+    loss = geomloss.SamplesLoss(loss=config['DA_metric'], 
+                                blur = blur, 
+                                scaling = scaling, 
+                                reach = reach
+                            )
     return loss(x, y)
 
 
@@ -137,7 +143,6 @@ def train_model(model,
     
     return best_val_epoch, best_val_acc, losses[-1]
 
-
 def train_model_da(model, 
                 train_dataloader, 
                 val_dataloader, 
@@ -177,7 +182,7 @@ def train_model_da(model,
     
     if dynamic_weighting:
         sigma_1 = torch.nn.Parameter(torch.tensor(1.0, device=device))
-        sigma_2 = torch.nn.Parameter(torch.tensor(1.1, device=device))  # Start with sigma_2 slightly larger
+        sigma_2 = torch.nn.Parameter(torch.tensor(1.0, device=device))
 
         optimizer.add_param_group({'params': [sigma_1, sigma_2]})
     
@@ -214,9 +219,13 @@ def train_model_da(model,
                 distances = torch.norm(source_features - target_features, dim=1)
                 max_distance = torch.max(distances)
                 max_distances.append(max_distance.item())
-                domain_loss = sinkhorn_loss(source_features, target_features, blur=0.1 * max_distance.detach().cpu().numpy(), reach=None)
+                
+                domain_loss = sinkhorn_loss(source_features, 
+                                            target_features, 
+                                            blur=0.1 * max_distance.detach().cpu().numpy(), 
+                                            scaling = config['parameters']['scaling'],
+                                            reach=None)
 
-                # Combine the losses
                 if dynamic_weighting:
                     loss = (1 / (2 * sigma_1**2)) * classification_loss + (1 / (2 * sigma_2**2)) * domain_loss + torch.log(sigma_1 * sigma_2)
                 else:
@@ -224,7 +233,6 @@ def train_model_da(model,
 
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=10.0)
-            ## clamp sigma_1 and sigma_2 to prevent them from becoming negative
             if dynamic_weighting:
                 sigma_1.data.clamp_(min=1e-3)
                 sigma_2.data.clamp_(min=1e-3)
@@ -287,7 +295,7 @@ def train_model_da(model,
                         target_features = target_features.view(target_features.size(0), -1)
 
                         classification_loss_ = F.cross_entropy(source_preds, source_outputs)
-                        domain_loss_ = sinkhorn_loss(source_features, target_features, blur=0.1 * max_distance.detach().cpu().numpy(), reach=0.1 * max_distance.detach().cpu().numpy())
+                        domain_loss_ = sinkhorn_loss(source_features, target_features, blur=0.1 * max_distance.detach().cpu().numpy(), reach=None)
 
                         if dynamic_weighting:
                             combined_loss = (1 / (2 * sigma_1**2)) * classification_loss_ + (1 / (2 * sigma_2**2)) * domain_loss_ + torch.log(sigma_1 * sigma_2)
