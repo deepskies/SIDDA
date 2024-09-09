@@ -177,6 +177,7 @@ def train_model_da(model,
     train_classification_losses, train_domain_losses = [], []
     val_losses, val_classification_losses, val_domain_losses = [], [], []
     max_distances = []
+    blur_vals = []
     
     print("Training Started!")
     
@@ -220,9 +221,12 @@ def train_model_da(model,
                 max_distance = torch.max(distances)
                 max_distances.append(max_distance.item())
                 
+                dynamic_blur_val = 0.1 * max_distance.detach().cpu().numpy()
+                blur_vals.append(dynamic_blur_val)
+                ## use dynamic blur val or .01, whichever is higher
                 domain_loss = sinkhorn_loss(source_features, 
                                             target_features, 
-                                            blur=0.1 * max_distance.detach().cpu().numpy(), 
+                                            blur=max(dynamic_blur_val, 0.01), 
                                             scaling = config['parameters']['scaling'],
                                             reach=None)
 
@@ -404,6 +408,8 @@ def train_model_da(model,
     np.save(os.path.join(loss_dir, f"val_classification_losses-{model_name}.npy"), np.array(val_classification_losses))
     np.save(os.path.join(loss_dir, f"val_domain_losses-{model_name}.npy"), np.array(val_domain_losses))
     np.save(os.path.join(loss_dir, f"steps-{model_name}.npy"), np.array(steps))
+    np.save(os.path.join(loss_dir, f"max_distances-{model_name}.npy"), np.array(max_distances))
+    np.save(os.path.join(loss_dir, f"blur_vals-{model_name}.npy"), np.array(blur_vals))
     
     # Plotting the losses
     plt.figure(figsize=(14, 8))
