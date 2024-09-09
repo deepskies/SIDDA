@@ -164,7 +164,7 @@ def train_model_da(model,
     else:
         model.to(device)
     
-    warmup = 10
+    warmup = config['parameters']['warmup']
     print("Model Loaded to Device!")
     best_val_acc, best_classification_loss, best_domain_loss = 0, float('inf'), float('inf')
     no_improvement_count = 0
@@ -201,22 +201,16 @@ def train_model_da(model,
                 loss = classification_loss
                 domain_loss = None  # No domain loss during warmup
             else:
-                # Concatenate inputs for a single forward pass
                 concatenated_inputs = torch.cat((inputs, target_inputs), dim=0)
                 batch_size = inputs.size(0)
 
-                # Forward pass with concatenated inputs
                 features, outputs = model(concatenated_inputs)
-
-                # Split the features and outputs back into original and target
                 source_features = features[:batch_size]
                 target_features = features[batch_size:]
                 source_outputs = outputs[:batch_size]
 
-                # Compute classification loss on the original data
                 classification_loss = F.cross_entropy(source_outputs, targets)
 
-                # Compute domain loss between original and target features
                 distances = torch.norm(source_features - target_features, dim=1)
                 max_distance = torch.max(distances)
                 max_distances.append(max_distance.item())
@@ -230,6 +224,10 @@ def train_model_da(model,
 
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=10.0)
+            ## clamp sigma_1 and sigma_2 to prevent them from becoming negative
+            if dynamic_weighting:
+                sigma_1.data.clamp_(min=1e-3)
+                sigma_2.data.clamp_(min=1e-3)
             optimizer.step()
 
             train_loss += loss.item()
