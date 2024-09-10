@@ -176,8 +176,8 @@ def train_model_da(model,
     losses, steps = [], []
     train_classification_losses, train_domain_losses = [], []
     val_losses, val_classification_losses, val_domain_losses = [], [], []
-    max_distances = []
-    blur_vals = []
+    max_distances, epoch_max_distances = [], []
+    blur_vals, epoch_blur_vals = [], []
     
     print("Training Started!")
     
@@ -246,6 +246,12 @@ def train_model_da(model,
             classification_losses.append(classification_loss.item())
             if epoch >= warmup:
                 domain_losses.append(domain_loss.item())
+                
+        mean_max_distance = np.mean(max_distances)
+        epoch_max_distances.append(mean_max_distance) 
+        
+        mean_blur_val = np.mean(blur_vals)
+        epoch_blur_vals.append(mean_blur_val)
 
         train_loss /= len(train_dataloader)
         train_classification_loss = np.mean(classification_losses)
@@ -455,7 +461,7 @@ def train_model_da(model,
     
     plt.figure(figsize=(10, 5))
     
-    plt.plot(steps, max_distances)
+    plt.plot(steps, epoch_max_distances)
     plt.axvline(x=best_val_epoch, color='b', linestyle='--', label='Best Val Epoch')
     plt.axvline(x=best_classification_epoch, color='y', linestyle='--', label='Best Classification Epoch')
     plt.axvline(x=best_domain_epoch, color='g', linestyle='--', label='Best Domain Epoch')
@@ -470,7 +476,7 @@ def train_model_da(model,
     
     plt.figure(figsize=(10, 5))
     
-    plt.plot(steps, blur_vals)
+    plt.plot(steps, epoch_blur_vals)
     plt.axhline(y=0.01, color='r', linestyle='--')
     plt.axhline(y=0.05, color='g', linestyle='--')
     plt.axvline(x=best_val_epoch, color='b', linestyle='--', label='Best Val Epoch')
