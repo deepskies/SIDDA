@@ -441,7 +441,7 @@ def train_model_da(model,
     plt.xlabel('Epochs')
     plt.ylabel('Loss')
     plt.title('Training Losses')
-    plt.yscale('log')
+    # plt.yscale('log')
     plt.legend()
 
     # Plot Validation Losses
@@ -452,7 +452,7 @@ def train_model_da(model,
     plt.xlabel('Epochs')
     plt.ylabel('Loss')
     plt.title('Validation Losses')
-    plt.yscale('log')
+    # plt.yscale('log')
     plt.legend()
 
     plt.tight_layout()
@@ -494,7 +494,7 @@ def train_model_da(model,
     return best_val_epoch, best_val_acc, best_classification_epoch, best_classification_loss, best_domain_epoch, best_domain_loss, losses[-1]
 
 def main(config):
-    model = d4_model()
+    model = d4_model() if config['model'] == 'D4' else cnn()
     model_name = str(config['model'])
     params_to_optimize = [p for p in model.parameters() if p.requires_grad]
     optimizer = optim.AdamW(params_to_optimize, 

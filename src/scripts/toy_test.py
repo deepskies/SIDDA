@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 import torch.nn as nn
 # from toy_models import d4_model
-from toy_model_simple import d4_model
+from toy_model_simple import d4_model, cnn
 from toy_dataset import Shapes
 from utils import OnePixelAttack
 
@@ -34,7 +34,7 @@ def load_models(directory_path, model_name='D4'):
             file_path = os.path.join(directory_path, file_name)
             print(f'Loading {model_name} from {file_path}...')
             
-            model = d4_model()
+            model = d4_model() if model_name == 'D4' else cnn()
             model.eval()
             model.load_state_dict(torch.load(file_path, map_location=device))
             
@@ -178,8 +178,9 @@ if __name__ == '__main__':
     parser.add_argument('--x_test_path', type=str, required=True, help='Path to the x_test data')
     parser.add_argument('--y_test_path', type=str, required=True, help='Path to the y_test data')
     parser.add_argument('--output_name', type=str, required=True, help='Name of the output file for the results')
+    parser.add_argument('--model_name', type=str, default='D4', help='Name of the model to be evaluated')
     parser.add_argument('--adversarial_attack', action='store_true', help='Apply adversarial attack to the input data')
     args = parser.parse_args()
     
     main(model_dir=args.model_path, output_name=args.output_name, x_test_path=args.x_test_path, y_test_path=args.y_test_path, adversarial_attack=args.adversarial_attack,
-         model_name='cnn')
+         model_name=args.model_name)
