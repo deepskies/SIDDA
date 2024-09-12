@@ -23,7 +23,7 @@ classes = (
 )
 
 
-def load_models(directory_path, model_name='D4'):
+def load_models(directory_path, model_name):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
     models = []
@@ -96,7 +96,7 @@ def compute_metrics(test_loader, model, model_name, save_dir, output_name):
     
     return sklearn_report
 @torch.no_grad()
-def main(model_dir, output_name, x_test_path, y_test_path, N=None, adversarial_attack=False, model_name='cnn'):
+def main(model_dir, output_name, x_test_path, y_test_path, model_name, N=None, adversarial_attack=False):
     
     metrics_dir = os.path.join(model_dir, 'metrics')
     if not os.path.exists(metrics_dir):
