@@ -234,7 +234,7 @@ class D4ConvNet(nn.Module):
         x = x.tensor.view(x.tensor.size(0), -1)
         x = self.dropout_fc(self.fc1(x))
         x = self.layer_norm(x)
-        latent_space = F.sigmoid(x)
+        latent_space = x.tensor
 
         x = self.fc2(x)
 
