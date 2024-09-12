@@ -134,7 +134,7 @@ class ConvNet(nn.Module):
         # Output Layer (Fully Connected)
         self.fc2 = nn.Linear(in_features=256, out_features=num_classes)
         self.fc2.weight.data.normal_(0, 0.01)
-        self.fc.bias.data.fill_(0.0)
+        self.fc2.bias.data.fill_(0.0)
 
     def forward(self, x):
         # First Convolutional Block
