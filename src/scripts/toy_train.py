@@ -221,7 +221,11 @@ def train_model_da(model,
                 max_distance = torch.max(distances)
                 max_distances.append(max_distance.item())
                 
-                dynamic_blur_val = 0.1 * max_distance.detach().cpu().numpy()
+                if max_distance.item() > 1:
+                    dynamic_blur_val = max_distance.detach().cpu().numpy()
+                else:
+                    dynamic_blur_val = 0.1 * max_distance.detach().cpu().numpy()
+                # dynamic_blur_val = 0.1 * max_distance.detach().cpu().numpy()
                 blur_vals.append(dynamic_blur_val)
                 ## use dynamic blur val or .01, whichever is higher
                 domain_loss = sinkhorn_loss(source_features, 
