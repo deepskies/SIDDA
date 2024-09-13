@@ -211,38 +211,22 @@ def train_model_da(model,
                 batch_size = inputs.size(0)
 
                 features, outputs = model(concatenated_inputs)
+                features = F.sigmoid(features)
                 source_features = features[:batch_size]
                 target_features = features[batch_size:]
                 source_outputs = outputs[:batch_size]
 
                 classification_loss = F.cross_entropy(source_outputs, targets)
                 
-                # Assume source_features and target_features are your feature tensors
-                features = torch.cat((source_features, target_features), dim=0)
-
-                # Calculate min and max values across both source and target features
-                X_min = features.min(dim=0, keepdim=True)[0]
-                X_max = features.max(dim=0, keepdim=True)[0]
-
-                # Apply Min-Max Scaling to source and target features
-                source_features_scaled = (source_features - X_min) / (X_max - X_min)
-                target_features_scaled = (target_features - X_min) / (X_max - X_min)
-
-                # Handle cases where max equals min (to avoid division by zero)
-                source_features = torch.where(X_max - X_min != 0, source_features_scaled, torch.zeros_like(source_features_scaled))
-                target_features = torch.where(X_max - X_min != 0, target_features_scaled, torch.zeros_like(target_features_scaled))
-
                 distances = torch.norm(source_features - target_features, dim=1)
                 max_distance = torch.max(distances)
                 max_distances.append(max_distance.item())
 
                 dynamic_blur_val = 0.1 * max_distance.detach().cpu().numpy()
-                # dynamic_blur_val = 0.1 * max_distance.detach().cpu().numpy()
                 blur_vals.append(dynamic_blur_val)
-                ## use dynamic blur val or .01, whichever is higher
                 domain_loss = sinkhorn_loss(source_features, 
                                             target_features, 
-                                            blur=max(dynamic_blur_val, 0.05), 
+                                            blur = min(max(dynamic_blur_val, .01), 1.0), 
                                             scaling = config['parameters']['scaling'],
                                             reach=None)
 
