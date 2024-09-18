@@ -226,7 +226,7 @@ def train_model_da(model,
                 blur_vals.append(dynamic_blur_val)
                 domain_loss = sinkhorn_loss(source_features, 
                                             target_features, 
-                                            blur = min(max(dynamic_blur_val, .01), 1.0), 
+                                            blur = max(dynamic_blur_val, 0.01), 
                                             scaling = config['parameters']['scaling'],
                                             reach=None)
 
