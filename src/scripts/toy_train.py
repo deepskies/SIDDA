@@ -231,7 +231,7 @@ def train_model_da(model,
                                             reach=None)
 
                 if dynamic_weighting:
-                    loss = (1 / (2 * sigma_1**2)) * classification_loss + (1 / (2 * sigma_2**2)) * domain_loss + torch.log(sigma_1 * sigma_2)
+                    loss = (1 / (2 * sigma_1**2)) * classification_loss + (1 / (2 * sigma_2**2)) * domain_loss + torch.log(torch.abs(sigma_1) * torch.abs(sigma_2))
                 else:
                     loss = classification_loss + scale_factor * domain_loss
 
@@ -313,7 +313,7 @@ def train_model_da(model,
                                                 )
                         
                         if dynamic_weighting:
-                            combined_loss = (1 / (2 * sigma_1**2)) * classification_loss_ + (1 / (2 * sigma_2**2)) * domain_loss_ + torch.log(sigma_1 * sigma_2)
+                            combined_loss = (1 / (2 * sigma_1**2)) * classification_loss_ + (1 / (2 * sigma_2**2)) * domain_loss_ + torch.log(torch.abs(sigma_1) * torch.abs(sigma_2))
                         else:
                             combined_loss = classification_loss_ + scale_factor * domain_loss_
 
