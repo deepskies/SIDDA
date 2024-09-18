@@ -95,6 +95,7 @@ def compute_metrics(test_loader, model, model_name, save_dir, output_name):
     plt.close()
     
     return sklearn_report
+
 @torch.no_grad()
 def main(model_dir, output_name, x_test_path, y_test_path, model_name, N=None, adversarial_attack=False):
     
@@ -178,7 +179,7 @@ if __name__ == '__main__':
     parser.add_argument('--x_test_path', type=str, required=True, help='Path to the x_test data')
     parser.add_argument('--y_test_path', type=str, required=True, help='Path to the y_test data')
     parser.add_argument('--output_name', type=str, required=True, help='Name of the output file for the results')
-    parser.add_argument('--model_name', type=str, default='D4', help='Name of the model to be evaluated')
+    parser.add_argument('--model_name', type=str, help='Name of the model to be evaluated')
     parser.add_argument('--adversarial_attack', action='store_true', help='Apply adversarial attack to the input data')
     args = parser.parse_args()
     

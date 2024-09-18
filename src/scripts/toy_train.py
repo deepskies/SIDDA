@@ -171,7 +171,7 @@ def train_model_da(model,
     
     warmup = config['parameters']['warmup']
     print("Model Loaded to Device!")
-    best_val_acc, best_classification_loss, best_domain_loss = 0, float('inf'), float('inf')
+    best_val_acc, best_classification_loss, best_domain_loss, best_total_val_loss = 0, float('inf'), float('inf'), float('inf')
     no_improvement_count = 0
     losses, steps = [], []
     train_classification_losses, train_domain_losses = [], []
@@ -360,6 +360,15 @@ def train_model_da(model,
             else:
                 print(f"Epoch: {epoch + 1}, Total Validation Loss: {val_loss:.4f}, Source Validation Accuracy: {source_val_acc:.2f}%, Learning rate: {lr}, Target Validation Accuracy: {target_val_acc:.2f}%")
                 print(f"Epoch: {epoch + 1}, Validation Classification Loss: {val_classification_loss:.4e}, Validation Domain Loss: {val_domain_loss:.4e}")
+                
+            if val_loss < best_total_val_loss:
+                best_total_val_loss = val_loss
+                best_val_epoch = epoch + 1
+                if torch.cuda.device_count() > 1:
+                    torch.save(model.eval().module.state_dict(), os.path.join(save_dir, "best_model_total_val_loss.pt"))
+                else:
+                    torch.save(model.eval().state_dict(), os.path.join(save_dir, "best_model_total_val_loss.pt"))
+                print(f"Saved best total validation loss model at epoch {best_val_epoch}")
             # Check and save the model with best validation accuracy
             if source_val_acc >= best_val_acc:
                 best_val_acc = source_val_acc
