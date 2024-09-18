@@ -450,7 +450,7 @@ def train_model_da(model,
     plt.xlabel('Epochs')
     plt.ylabel('Loss')
     plt.title('Training Losses')
-    # plt.yscale('log')
+    plt.yscale('log')
     plt.legend()
 
     # Plot Validation Losses
@@ -461,7 +461,7 @@ def train_model_da(model,
     plt.xlabel('Epochs')
     plt.ylabel('Loss')
     plt.title('Validation Losses')
-    # plt.yscale('log')
+    plt.yscale('log')
     plt.legend()
 
     plt.tight_layout()
@@ -641,7 +641,7 @@ if __name__ == '__main__':
 
     device = ('cuda' if torch.cuda.is_available() else 'cpu')
         
-    set_all_seeds(42)
+    set_all_seeds(1)
 
     parser = argparse.ArgumentParser(description = 'Train the models')
     parser.add_argument('--config', metavar = 'config', required=True,
