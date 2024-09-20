@@ -211,7 +211,6 @@ def train_model_da(model,
                 batch_size = inputs.size(0)
 
                 features, outputs = model(concatenated_inputs)
-                features = F.sigmoid(features)
                 source_features = features[:batch_size]
                 target_features = features[batch_size:]
                 source_outputs = outputs[:batch_size]
@@ -369,27 +368,30 @@ def train_model_da(model,
                 else:
                     torch.save(model.eval().state_dict(), os.path.join(save_dir, "best_model_total_val_loss.pt"))
                 print(f"Saved best total validation loss model at epoch {best_val_epoch}")
-            # Check and save the model with best validation accuracy
+                
+            else:
+                no_improvement_count += 1
+                
             if source_val_acc >= best_val_acc:
                 best_val_acc = source_val_acc
-                best_val_epoch = epoch + 1
+                best_val_acc_epoch = epoch + 1
                 model_path = os.path.join(save_dir, "best_model_val_acc.pt")
                 if torch.cuda.device_count() > 1:
                     torch.save(model.eval().module.state_dict(), model_path)
                 else:
                     torch.save(model.eval().state_dict(), model_path)
-                print(f"Saved best validation accuracy model at epoch {best_val_epoch}")
+                print(f"Saved best validation accuracy model at epoch {best_val_acc_epoch}")
 
             # Check and save the model with lowest classification loss
             if val_classification_loss <= best_classification_loss:
                 best_classification_loss = val_classification_loss
-                best_classification_epoch = epoch + 1
+                best_classification_loss_epoch = epoch + 1
                 model_path = os.path.join(save_dir, "best_model_classification_loss.pt")
                 if torch.cuda.device_count() > 1:
                     torch.save(model.eval().module.state_dict(), model_path)
                 else:
                     torch.save(model.eval().state_dict(), model_path)
-                print(f"Saved lowest classification loss model at epoch {best_classification_epoch}")
+                print(f"Saved lowest classification loss model at epoch {best_classification_loss_epoch}")
 
             # Check and save the model with lowest domain loss
             if val_domain_loss <= best_domain_loss:
@@ -444,7 +446,7 @@ def train_model_da(model,
     plt.plot(steps, train_classification_losses, label='Train Classification Loss')
     plt.plot(steps, train_domain_losses, label='Train Domain Loss')
     plt.axvline(x=best_val_epoch, color='b', linestyle='--', label='Best Val Epoch')
-    plt.axvline(x=best_classification_epoch, color='y', linestyle='--', label='Best Classification Epoch')
+    plt.axvline(x=best_classification_loss_epoch, color='y', linestyle='--', label='Best Classification Epoch')
     plt.axvline(x=best_domain_epoch, color='g', linestyle='--', label='Best Domain Epoch')
     plt.legend()
     plt.xlabel('Epochs')
@@ -472,7 +474,7 @@ def train_model_da(model,
     
     plt.plot(steps, epoch_max_distances)
     plt.axvline(x=best_val_epoch, color='b', linestyle='--', label='Best Val Epoch')
-    plt.axvline(x=best_classification_epoch, color='y', linestyle='--', label='Best Classification Epoch')
+    plt.axvline(x=best_classification_loss_epoch, color='y', linestyle='--', label='Best Classification Epoch')
     plt.axvline(x=best_domain_epoch, color='g', linestyle='--', label='Best Domain Epoch')
     plt.legend()
     plt.xlabel('Epochs')
@@ -489,7 +491,7 @@ def train_model_da(model,
     plt.axhline(y=0.01, color='r', linestyle='--')
     plt.axhline(y=0.05, color='g', linestyle='--')
     plt.axvline(x=best_val_epoch, color='b', linestyle='--', label='Best Val Epoch')
-    plt.axvline(x=best_classification_epoch, color='y', linestyle='--', label='Best Classification Epoch')
+    plt.axvline(x=best_classification_loss_epoch, color='y', linestyle='--', label='Best Classification Epoch')
     plt.axvline(x=best_domain_epoch, color='g', linestyle='--', label='Best Domain Epoch')
     plt.legend()
     plt.xlabel('Epochs')
@@ -500,7 +502,7 @@ def train_model_da(model,
     plt.savefig(os.path.join(loss_dir, f"blur_value_plot-{model_name}.png"))
     plt.close()
 
-    return best_val_epoch, best_val_acc, best_classification_epoch, best_classification_loss, best_domain_epoch, best_domain_loss, losses[-1]
+    return best_val_epoch, best_val_acc, best_classification_loss_epoch, best_classification_loss, best_domain_epoch, best_domain_loss, losses[-1]
 
 def main(config):
     model = d4_model() if config['model'] == 'D4' else cnn()
