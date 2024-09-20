@@ -220,15 +220,16 @@ class D4ConvNet(nn.Module):
         self.fc2 = nn.Linear(in_features=256, out_features=num_classes)
         self.fc2.weight.data.normal_(0, 0.01)
         self.fc2.bias.data.fill_(0.0)
-        self.dropout_fc = nn.Dropout(p=1)  # Add this in the __init__ method
-
 
     def forward(self, x):
         x = escnn_nn.GeometricTensor(x, self.input_type)
         
         x = self.pool1(self.relu1(self.bn1(self.conv1(x))))
+        x = self.dropout1(x)
         x = self.pool2(self.relu2(self.bn2(self.conv2(x))))
+        x = self.dropout2(x)
         x = self.pool3(self.relu3(self.bn3(self.conv3(x))))
+        x = self.dropout3(x)
         
         x = self.gpool(x)
         
