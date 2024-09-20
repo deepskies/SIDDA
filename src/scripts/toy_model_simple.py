@@ -113,22 +113,23 @@ class ConvNet(nn.Module):
         self.conv1 = nn.Conv2d(in_channels=1, out_channels=8, kernel_size=5, stride=1, padding=2)
         self.bn1 = nn.BatchNorm2d(8)
         self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
+        self.dropout1 = nn.Dropout(p=0.2)
         
         # Second Convolutional Layer
         self.conv2 = nn.Conv2d(in_channels=8, out_channels=16, kernel_size=3, stride=1, padding=1)
         self.bn2 = nn.BatchNorm2d(16)
         self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
-        
+        self.dropout2 = nn.Dropout(p=0.2)
         # Third Convolutional Layer
         self.conv3 = nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, stride=1, padding=1)
         self.bn3 = nn.BatchNorm2d(32)
         self.pool3 = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
+        self.dropout3 = nn.Dropout(p=0.2)
         
         # Bottleneck Layer (Fully Connected)
         self.fc1 = nn.Linear(in_features=32 * 12 * 12, out_features=256)
         self.fc1.weight.data.normal_(0, .005)
         self.fc1.bias.data.fill_(0.0)
-        self.dropout_fc = nn.Dropout(p=0.2)
         self.layer_norm = nn.LayerNorm(256)
         
         # Output Layer (Fully Connected)
@@ -140,24 +141,24 @@ class ConvNet(nn.Module):
         # First Convolutional Block
         x = F.relu(self.bn1(self.conv1(x)))
         x = self.pool1(x)
+        x = self.dropout1(x)
         
         # Second Convolutional Block
         x = F.relu(self.bn2(self.conv2(x)))
         x = self.pool2(x)
+        x = self.dropout2(x)
         
         # Third Convolutional Block
         x = F.relu(self.bn3(self.conv3(x)))
         x = self.pool3(x)
-        
-        # Flattening
+        x = self.dropout3(x)
+
         x = x.view(-1, 32 * 12 * 12)
-        
-        # Bottleneck Layer
-        x = self.dropout_fc(self.fc1(x))
+
+        x = self.fc1(x)
         x = self.layer_norm(x)
         latent_space = F.sigmoid(x)
-        
-        # Output Layer
+
         x = self.fc2(x)
         
         return latent_space, x
@@ -219,7 +220,7 @@ class D4ConvNet(nn.Module):
         self.fc2 = nn.Linear(in_features=256, out_features=num_classes)
         self.fc2.weight.data.normal_(0, 0.01)
         self.fc2.bias.data.fill_(0.0)
-        self.dropout_fc = nn.Dropout(p=0.2)  # Add this in the __init__ method
+        self.dropout_fc = nn.Dropout(p=1)  # Add this in the __init__ method
 
 
     def forward(self, x):
@@ -234,7 +235,8 @@ class D4ConvNet(nn.Module):
         x = x.tensor.view(x.tensor.size(0), -1)
         x = self.dropout_fc(self.fc1(x))
         x = self.layer_norm(x)
-        latent_space = x.tensor
+        latent_space = x
+        print(latent_space)
 
         x = self.fc2(x)
 
