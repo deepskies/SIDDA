@@ -306,7 +306,7 @@ def train_model_da(model,
                         classification_loss_ = F.cross_entropy(source_preds, source_outputs)
                         domain_loss_ = sinkhorn_loss(source_features, 
                                                      target_features, 
-                                                     blur=0.1 * max_distance.detach().cpu().numpy(), 
+                                                     blur=max(.01, .1 * max_distance.detach().cpu().numpy()), 
                                                      scaling=config['parameters']['scaling'], 
                                                      reach=None
                                                 )
