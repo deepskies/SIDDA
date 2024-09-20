@@ -181,7 +181,7 @@ class D4ConvNet(nn.Module):
         self.bn1 = escnn_nn.InnerBatchNorm(self.conv1.out_type)
         self.relu1 = escnn_nn.ReLU(self.conv1.out_type)
         self.pool1 = escnn_nn.PointwiseMaxPool2D(self.conv1.out_type, kernel_size=2, stride=2, padding=0)
-        # self.dropout1 = escnn_nn.PointwiseDropout(self.conv1.out_type, p=0.2)
+        self.dropout1 = escnn_nn.PointwiseDropout(self.conv1.out_type, p=0.2)
 
         # Second Convolutional Layer
         self.conv2 = escnn_nn.R2Conv(
@@ -194,7 +194,7 @@ class D4ConvNet(nn.Module):
         self.bn2 = escnn_nn.InnerBatchNorm(self.conv2.out_type)
         self.relu2 = escnn_nn.ReLU(self.conv2.out_type)
         self.pool2 = escnn_nn.PointwiseMaxPool2D(self.conv2.out_type, kernel_size=2, stride=2, padding=0)
-        # self.dropout2 = escnn_nn.PointwiseDropout(self.conv2.out_type, p=0.2)
+        self.dropout2 = escnn_nn.PointwiseDropout(self.conv2.out_type, p=0.2)
 
         # Third Convolutional Layer
         self.conv3 = escnn_nn.R2Conv(
@@ -206,7 +206,7 @@ class D4ConvNet(nn.Module):
         self.bn3 = escnn_nn.InnerBatchNorm(self.conv3.out_type)
         self.relu3 = escnn_nn.ReLU(self.conv3.out_type)
         self.pool3 = escnn_nn.PointwiseMaxPool2D(self.conv3.out_type, kernel_size=2, stride=2, padding=0)
-        # self.dropout3 = escnn_nn.PointwiseDropout(self.conv3.out_type, p=0.2)
+        self.dropout3 = escnn_nn.PointwiseDropout(self.conv3.out_type, p=0.2)
         
         self.gpool = escnn_nn.GroupPooling(self.pool3.out_type)
         
@@ -233,7 +233,7 @@ class D4ConvNet(nn.Module):
         x = self.gpool(x)
         
         x = x.tensor.view(x.tensor.size(0), -1)
-        x = self.dropout_fc(self.fc1(x))
+        x = self.fc1(x)
         x = self.layer_norm(x)
         latent_space = F.sigmoid(x)
 
