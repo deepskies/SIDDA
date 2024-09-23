@@ -238,7 +238,7 @@ def train_model_da(model,
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=10.0)
             if dynamic_weighting:
                 sigma_1.data.clamp_(min=1e-3)
-                sigma_2.data.clamp_(min=1e-3)
+                sigma_2.data.clamp_(min=0.25*sigma_1.data.item())
             optimizer.step()
 
             train_loss += loss.item()
@@ -312,7 +312,8 @@ def train_model_da(model,
                                                 )
                         
                         if dynamic_weighting:
-                            combined_loss = (1 / (2 * sigma_1**2)) * classification_loss_ + (1 / (2 * sigma_2**2)) * domain_loss_ + torch.log(torch.abs(sigma_1) * torch.abs(sigma_2))
+                            # combined_loss = (1 / (2 * sigma_1**2)) * classification_loss_ + (1 / (2 * sigma_2**2)) * domain_loss_ + torch.log(torch.abs(sigma_1) * torch.abs(sigma_2))
+                            combined_loss = classification_loss_ + domain_loss_
                         else:
                             combined_loss = classification_loss_ + scale_factor * domain_loss_
 
@@ -360,7 +361,7 @@ def train_model_da(model,
                 print(f"Epoch: {epoch + 1}, Total Validation Loss: {val_loss:.4f}, Source Validation Accuracy: {source_val_acc:.2f}%, Learning rate: {lr}, Target Validation Accuracy: {target_val_acc:.2f}%")
                 print(f"Epoch: {epoch + 1}, Validation Classification Loss: {val_classification_loss:.4e}, Validation Domain Loss: {val_domain_loss:.4e}")
                 
-            if val_loss < best_total_val_loss:
+            if val_loss < best_total_val_loss and epoch >= warmup:
                 best_total_val_loss = val_loss
                 best_val_epoch = epoch + 1
                 if torch.cuda.device_count() > 1:
