@@ -176,7 +176,7 @@ def train_model_da(model,
     losses, steps = [], []
     train_classification_losses, train_domain_losses = [], []
     val_losses, val_classification_losses, val_domain_losses = [], [], []
-    max_distances, epoch_max_distances = [], []
+    median_distances, epoch_max_distances = [], []
     blur_vals, epoch_blur_vals = [], []
     
     print("Training Started!")
@@ -210,24 +210,29 @@ def train_model_da(model,
                 concatenated_inputs = torch.cat((inputs, target_inputs), dim=0)
                 batch_size = inputs.size(0)
 
+                # Pass through the model to get features and outputs
                 features, outputs = model(concatenated_inputs)
                 source_features = features[:batch_size]
                 target_features = features[batch_size:]
                 source_outputs = outputs[:batch_size]
-
+                
                 classification_loss = F.cross_entropy(source_outputs, targets)
                 
-                distances = torch.norm(source_features - target_features, dim=1)
-                max_distance = torch.max(distances)
-                max_distances.append(max_distance.item())
+                pairwise_distances = torch.cdist(source_features, target_features, p=2)
+                flattened_distances = pairwise_distances.view(-1)
+                median_distance = torch.median(flattened_distances)
+                median_distances.append(median_distance)
 
-                dynamic_blur_val = 0.1 * max_distance.detach().cpu().numpy()
+                dynamic_blur_val = 0.05 * median_distance.detach().cpu().numpy()
                 blur_vals.append(dynamic_blur_val)
-                domain_loss = sinkhorn_loss(source_features, 
-                                            target_features, 
-                                            blur = max(dynamic_blur_val, 0.01), 
-                                            scaling = config['parameters']['scaling'],
-                                            reach=None)
+
+                domain_loss = sinkhorn_loss(
+                    source_features, 
+                    target_features, 
+                    blur=max(dynamic_blur_val, 0.01),  # Apply lower bound to blur
+                    scaling=config['parameters']['scaling'],
+                    reach=None
+                )
 
                 if dynamic_weighting:
                     loss = (1 / (2 * sigma_1**2)) * classification_loss + (1 / (2 * sigma_2**2)) * domain_loss + torch.log(torch.abs(sigma_1) * torch.abs(sigma_2))
@@ -246,8 +251,8 @@ def train_model_da(model,
             if epoch >= warmup:
                 domain_losses.append(domain_loss.item())
                 
-        mean_max_distance = np.mean(max_distances)
-        epoch_max_distances.append(mean_max_distance) 
+        mean_median_distance = np.mean(median_distances)
+        epoch_max_distances.append(mean_median_distance) 
         
         mean_blur_val = np.mean(blur_vals)
         epoch_blur_vals.append(mean_blur_val)
@@ -264,7 +269,7 @@ def train_model_da(model,
         # Dynamic weighting logging only after warmup
         if epoch >= warmup and dynamic_weighting:
             print(f"Epoch: {epoch + 1}, sigma_1: {sigma_1.item():.4f}, sigma_2: {sigma_2.item():.4f}")
-            print(f"Epoch: {epoch + 1}, Max Distance: {max_distance:.4f}")
+            print(f"Epoch: {epoch + 1}, Max Distance: {median_distance:.4f}")
 
         # Adjust logging based on warmup phase
         if epoch < warmup:
@@ -297,25 +302,31 @@ def train_model_da(model,
                         target_preds = None  # No target predictions during warmup
 
                     else:
-                        source_features, source_preds = model(source_inputs)
-                        target_features, target_preds = model(target_inputs)
+                        concatenated_inputs = torch.cat((inputs, target_inputs), dim=0)
+                        batch_size = inputs.size(0)
 
-                        source_features = source_features.view(source_features.size(0), -1)
-                        target_features = target_features.view(target_features.size(0), -1)
+                        # Pass through the model to get features and outputs
+                        features, preds = model(concatenated_inputs)
+                        source_features = features[:batch_size]
+                        target_features = features[batch_size:]
+                        source_preds = preds[:batch_size]
+                        target_preds = preds[batch_size:]
 
                         classification_loss_ = F.cross_entropy(source_preds, source_outputs)
+                        
+                        pairwise_distances = torch.cdist(source_features, target_features, p=2)
+                        flattened_distances = pairwise_distances.view(-1)
+                        median_distance = torch.median(flattened_distances)
+
+                        dynamic_blur_val = 0.05 * median_distance.detach().cpu().numpy()
                         domain_loss_ = sinkhorn_loss(source_features, 
                                                      target_features, 
-                                                     blur=max(.01, .1 * max_distance.detach().cpu().numpy()), 
+                                                     blur=max(dynamic_blur_val, 0.01),  # Apply lower bound to blur
                                                      scaling=config['parameters']['scaling'], 
                                                      reach=None
                                                 )
                         
-                        if dynamic_weighting:
-                            # combined_loss = (1 / (2 * sigma_1**2)) * classification_loss_ + (1 / (2 * sigma_2**2)) * domain_loss_ + torch.log(torch.abs(sigma_1) * torch.abs(sigma_2))
-                            combined_loss = classification_loss_ + domain_loss_
-                        else:
-                            combined_loss = classification_loss_ + scale_factor * domain_loss_
+                        combined_loss = classification_loss_ + domain_loss_
 
                         # Calculate target predictions only after warmup
                         _, target_predicted = torch.max(target_preds.data, 1)
@@ -426,7 +437,7 @@ def train_model_da(model,
     np.save(os.path.join(loss_dir, f"val_classification_losses-{model_name}.npy"), np.array(val_classification_losses))
     np.save(os.path.join(loss_dir, f"val_domain_losses-{model_name}.npy"), np.array(val_domain_losses))
     np.save(os.path.join(loss_dir, f"steps-{model_name}.npy"), np.array(steps))
-    np.save(os.path.join(loss_dir, f"max_distances-{model_name}.npy"), np.array(max_distances))
+    np.save(os.path.join(loss_dir, f"max_distances-{model_name}.npy"), np.array(median_distances))
     np.save(os.path.join(loss_dir, f"blur_vals-{model_name}.npy"), np.array(blur_vals))
     
     # Plotting the losses

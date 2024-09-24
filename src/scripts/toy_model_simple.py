@@ -157,7 +157,7 @@ class ConvNet(nn.Module):
 
         x = self.fc1(x)
         x = self.layer_norm(x)
-        latent_space = F.sigmoid(x)
+        latent_space = x
 
         x = self.fc2(x)
         
@@ -236,7 +236,7 @@ class D4ConvNet(nn.Module):
         x = x.tensor.view(x.tensor.size(0), -1)
         x = self.fc1(x)
         x = self.layer_norm(x)
-        latent_space = F.sigmoid(x)
+        latent_space = x
 
         x = self.fc2(x)
 
