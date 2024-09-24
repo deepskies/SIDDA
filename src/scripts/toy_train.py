@@ -221,7 +221,7 @@ def train_model_da(model,
                 pairwise_distances = torch.cdist(source_features, target_features, p=2)
                 flattened_distances = pairwise_distances.view(-1)
                 median_distance = torch.median(flattened_distances)
-                median_distances.append(median_distance)
+                median_distances.append(median_distance.detach().cpu().numpy())
 
                 dynamic_blur_val = 0.05 * median_distance.detach().cpu().numpy()
                 blur_vals.append(dynamic_blur_val)
