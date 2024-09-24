@@ -395,7 +395,7 @@ def train_model_da(model,
                 print(f"Saved best validation accuracy model at epoch {best_val_acc_epoch}")
 
             # Check and save the model with lowest classification loss
-            if val_classification_loss <= best_classification_loss:
+            if val_classification_loss <= best_classification_loss and epoch >= warmup:
                 best_classification_loss = val_classification_loss
                 best_classification_loss_epoch = epoch + 1
                 model_path = os.path.join(save_dir, "best_model_classification_loss.pt")
@@ -406,7 +406,7 @@ def train_model_da(model,
                 print(f"Saved lowest classification loss model at epoch {best_classification_loss_epoch}")
 
             # Check and save the model with lowest domain loss
-            if val_domain_loss <= best_domain_loss:
+            if val_domain_loss <= best_domain_loss and epoch >= warmup:
                 best_domain_loss = val_domain_loss
                 best_domain_epoch = epoch + 1
                 model_path = os.path.join(save_dir, "best_model_domain_loss.pt")
