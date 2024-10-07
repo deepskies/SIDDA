@@ -12,6 +12,7 @@ num_classes = 3
 feature_fields = [2, 2, 2] 
     
 class ConvNet(nn.Module):
+    #### for shapes and blobs dataset
     def __init__(self, num_classes=3):
         super(ConvNet, self).__init__()
         # First Convolutional Layer
@@ -59,6 +60,65 @@ class ConvNet(nn.Module):
         x = self.dropout3(x)
 
         x = x.view(-1, 32 * 12 * 12)
+
+        x = self.fc1(x)
+        x = self.layer_norm(x)
+        latent_space = x
+
+        x = self.fc2(x)
+        
+        return latent_space, x
+    
+    
+class ConvNet_MNISTM(nn.Module):
+    #### for shapes and blobs dataset
+    def __init__(self, num_classes=3):
+        super(ConvNet_MNISTM, self).__init__()
+        # First Convolutional Layer
+        self.conv1 = nn.Conv2d(in_channels=3, out_channels=8, kernel_size=5, stride=1, padding=2)
+        self.bn1 = nn.BatchNorm2d(8)
+        self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
+        self.dropout1 = nn.Dropout(p=0.2)
+        
+        # Second Convolutional Layer
+        self.conv2 = nn.Conv2d(in_channels=8, out_channels=16, kernel_size=3, stride=1, padding=1)
+        self.bn2 = nn.BatchNorm2d(16)
+        self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
+        self.dropout2 = nn.Dropout(p=0.2)
+        # Third Convolutional Layer
+        self.conv3 = nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, stride=1, padding=1)
+        self.bn3 = nn.BatchNorm2d(32)
+        self.pool3 = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
+        self.dropout3 = nn.Dropout(p=0.2)
+        
+        # Bottleneck Layer (Fully Connected)
+        self.fc1 = nn.Linear(in_features=32 * 8 * 2, out_features=256)
+        self.fc1.weight.data.normal_(0, .005)
+        self.fc1.bias.data.fill_(0.0)
+        self.layer_norm = nn.LayerNorm(256)
+        
+        # Output Layer (Fully Connected)
+        self.fc2 = nn.Linear(in_features=256, out_features=num_classes)
+        self.fc2.weight.data.normal_(0, 0.01)
+        self.fc2.bias.data.fill_(0.0)
+
+    def forward(self, x):
+        # First Convolutional Block
+        x = F.relu(self.bn1(self.conv1(x)))
+        x = self.pool1(x)
+        x = self.dropout1(x)
+        
+        # Second Convolutional Block
+        x = F.relu(self.bn2(self.conv2(x)))
+        x = self.pool2(x)
+        x = self.dropout2(x)
+        
+        # Third Convolutional Block
+        x = F.relu(self.bn3(self.conv3(x)))
+        x = self.pool3(x)
+        x = self.dropout3(x)
+
+        x = x.view(-1, 32 * 8 * 2)
 
         x = self.fc1(x)
         x = self.layer_norm(x)
@@ -151,6 +211,10 @@ def cnn(num_classes):
     model = ConvNet(num_classes=num_classes)
     return model
 
+def cnn_mnistm(num_classes):
+    model = ConvNet_MNISTM(num_classes=num_classes)
+    return model
+
 def d4_model(num_classes):
     model = D4ConvNet(num_classes=num_classes)
     return model
@@ -171,11 +235,10 @@ if __name__ == "__main__":
         print(table)
         print(f"Total Trainable Params: {total_params}")
         
-    model = d4_model()
+    model = cnn_mnistm(num_classes=10)
     print_model_parameters(model)
-    # print(summary(model, (1, 100, 100)))
-    # print(sum(p.numel() for p in model.parameters() if p.requires_grad and p not in model.fc1.parameters() and p not in model.fc2.parameters()))
-    x = torch.randn(32, 1, 100 ,100)
+    # x = torch.randn(32, 1, 100 ,100)
+    x = torch.randn(1, 3, 32, 32)
     output = model(x)
     print(output[0].shape)
     print(output[1].shape)
