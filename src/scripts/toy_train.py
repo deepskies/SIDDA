@@ -12,7 +12,7 @@ from torch import optim
 from torchvision import transforms
 # from toy_models import d4_model, feature_fields
 from toy_model_simple import cnn, d4_model, cnn_mnistm
-from toy_dataset import Shapes
+from toy_dataset import Shapes, Blobs, MnistM
 from tqdm import tqdm
 import random
 import geomloss
@@ -607,7 +607,7 @@ def main(config):
     start = time.time()
 
     # Load source dataset
-    train_dataset = Shapes(input_path=config['train_data']['input_path'], 
+    train_dataset = MnistM(input_path=config['train_data']['input_path'], 
                         output_path=config['train_data']['output_path'], 
                         transform=train_transform)
 
@@ -619,7 +619,7 @@ def main(config):
 
     if config['DA']:
         # Load target dataset
-        target_dataset = Shapes(input_path=config['train_data']['target_input_path'], 
+        target_dataset = MnistM(input_path=config['train_data']['target_input_path'], 
                                 output_path=config['train_data']['target_output_path'], 
                                 transform=train_transform)
         
