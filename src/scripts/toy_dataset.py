@@ -64,6 +64,36 @@ class Blobs(Dataset):
     def __len__(self) -> int:
         return self.length
     
+    
+class MnistM(Dataset):
+    def __init__(self, input_path: str, output_path: str, transform: Optional[Callable] = None):
+        self.input_path = input_path
+        self.output_path = output_path
+        self.transform = transform
+        
+        try:
+            self.img = np.load(self.input_path)
+            self.label = np.load(self.output_path)
+        except Exception as e:
+            raise RuntimeError(f"Error loading data from {input_path} and {output_path}: {e}")
+        
+        if len(self.img) != len(self.label):
+            raise ValueError("Input and output files must have the same length.")
+        
+        self.length = len(self.label)
+
+    def __getitem__(self, idx: int):
+        img = self.img[idx]
+        label = torch.tensor(self.label[idx], dtype=torch.long)
+        
+        if self.transform:
+            img = self.transform(img)
+        
+        return img, label
+
+    def __len__(self) -> int:
+        return self.length
+    
 if __name__ == '__main__':
     
     input_path_shapes = '/Users/snehpandya/Projects/GCNN_DA/data/toy_dataset_shapes/shapes_data_noisy.npy'

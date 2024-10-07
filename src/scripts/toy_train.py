@@ -17,6 +17,27 @@ from tqdm import tqdm
 import random
 import geomloss
 
+import torch
+import torch.nn.functional as F
+
+def kl_divergence(p, q):
+    # Add a small epsilon to avoid log(0) and division by zero
+    p = p + 1e-10
+    q = q + 1e-10
+    return torch.sum(p * torch.log(p / q), dim=-1)
+
+def jensen_shannon_divergence(p, q):
+    # Calculate the mean of the two distributions
+    m = 0.5 * (p + q)
+    # Jensen-Shannon divergence is the average of KL divergences
+    jsd = 0.5 * kl_divergence(p, m) + 0.5 * kl_divergence(q, m)
+    return jsd
+
+def jensen_shannon_distance(p, q):
+    # Jensen-Shannon distance is the square root of the divergence
+    jsd = jensen_shannon_divergence(p, q)
+    return torch.sqrt(jsd)
+
 def sinkhorn_loss(x, 
                   y,
                   blur,
@@ -177,6 +198,7 @@ def train_model_da(model,
     train_classification_losses, train_domain_losses = [], []
     val_losses, val_classification_losses, val_domain_losses = [], [], []
     median_distances, epoch_max_distances = [], []
+    js_distances = []
     blur_vals, epoch_blur_vals = [], []
     
     print("Training Started!")
@@ -222,6 +244,7 @@ def train_model_da(model,
                 flattened_distances = pairwise_distances.view(-1)
                 median_distance = torch.median(flattened_distances)
                 median_distances.append(median_distance.detach().cpu().numpy())
+                js_distances.append(jensen_shannon_distance(source_features, target_features).detach().cpu().numpy())
 
                 dynamic_blur_val = 0.05 * median_distance.detach().cpu().numpy()
                 blur_vals.append(dynamic_blur_val)
@@ -302,8 +325,8 @@ def train_model_da(model,
                         target_preds = None  # No target predictions during warmup
 
                     else:
-                        concatenated_inputs = torch.cat((inputs, target_inputs), dim=0)
-                        batch_size = inputs.size(0)
+                        concatenated_inputs = torch.cat((source_inputs, target_inputs), dim=0)
+                        batch_size = source_inputs.size(0)
 
                         # Pass through the model to get features and outputs
                         features, preds = model(concatenated_inputs)
@@ -439,6 +462,7 @@ def train_model_da(model,
     np.save(os.path.join(loss_dir, f"steps-{model_name}.npy"), np.array(steps))
     np.save(os.path.join(loss_dir, f"max_distances-{model_name}.npy"), np.array(median_distances))
     np.save(os.path.join(loss_dir, f"blur_vals-{model_name}.npy"), np.array(blur_vals))
+    np.save(os.path.join(loss_dir, f"js_distances-{model_name}.npy"), np.array(js_distances))
     
     # Plotting the losses
     plt.figure(figsize=(14, 8))
@@ -517,7 +541,8 @@ def train_model_da(model,
     return best_val_epoch, best_val_acc, best_classification_loss_epoch, best_classification_loss, best_domain_epoch, best_domain_loss, losses[-1]
 
 def main(config):
-    model = d4_model() if config['model'] == 'D4' else cnn()
+    num_classes = config['num_classes']
+    model = d4_model(num_classes) if config['model'] == 'D4' else cnn(num_classes)
     model_name = str(config['model'])
     params_to_optimize = [p for p in model.parameters() if p.requires_grad]
     optimizer = optim.AdamW(params_to_optimize, 
