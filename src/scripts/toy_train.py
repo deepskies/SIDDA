@@ -197,7 +197,7 @@ def train_model_da(model,
     losses, steps = [], []
     train_classification_losses, train_domain_losses = [], []
     val_losses, val_classification_losses, val_domain_losses = [], [], []
-    median_distances, epoch_max_distances = [], []
+    max_distances, epoch_max_distances = [], []
     js_distances = []
     blur_vals, epoch_blur_vals = [], []
     
@@ -215,8 +215,8 @@ def train_model_da(model,
         classification_losses, domain_losses = [], []
 
         for i, (batch, target_batch) in tqdm(enumerate(zip(train_dataloader, target_dataloader))):
-            inputs, targets = batch
-            inputs, targets = inputs.to(device).float(), targets.to(device)
+            source_inputs, source_outputs = batch
+            source_inputs, source_outputs = source_inputs.to(device).float(), source_outputs.to(device)
 
             target_inputs, _ = target_batch
             target_inputs = target_inputs.to(device).float()
@@ -224,29 +224,29 @@ def train_model_da(model,
             optimizer.zero_grad()
 
             if epoch < warmup:
-                _, outputs = model(inputs)
-                classification_loss = F.cross_entropy(outputs, targets)
+                _, model_outputs = model(source_inputs)
+                classification_loss = F.cross_entropy(model_outputs, source_outputs)
                 loss = classification_loss
                 domain_loss = None  # No domain loss during warmup
             else:
-                concatenated_inputs = torch.cat((inputs, target_inputs), dim=0)
-                batch_size = inputs.size(0)
+                concatenated_inputs = torch.cat((source_inputs, target_inputs), dim=0)
+                batch_size = source_inputs.size(0)
 
                 # Pass through the model to get features and outputs
-                features, outputs = model(concatenated_inputs)
+                features, model_outputs = model(concatenated_inputs)
                 source_features = features[:batch_size]
                 target_features = features[batch_size:]
-                source_outputs = outputs[:batch_size]
+                source_model_outputs = model_outputs[:batch_size]
                 
-                classification_loss = F.cross_entropy(source_outputs, targets)
+                classification_loss = F.cross_entropy(source_model_outputs, source_outputs)
                 
                 pairwise_distances = torch.cdist(source_features, target_features, p=2)
                 flattened_distances = pairwise_distances.view(-1)
-                median_distance = torch.median(flattened_distances)
-                median_distances.append(median_distance.detach().cpu().numpy())
+                max_distance = torch.max(flattened_distances)
+                max_distances.append(max_distance.detach().cpu().numpy())
                 js_distances.append(jensen_shannon_distance(source_features, target_features).detach().cpu().numpy())
 
-                dynamic_blur_val = 0.05 * median_distance.detach().cpu().numpy()
+                dynamic_blur_val = 0.1 * max_distance.detach().cpu().numpy()
                 blur_vals.append(dynamic_blur_val)
 
                 domain_loss = sinkhorn_loss(
@@ -274,8 +274,8 @@ def train_model_da(model,
             if epoch >= warmup:
                 domain_losses.append(domain_loss.item())
                 
-        mean_median_distance = np.mean(median_distances)
-        epoch_max_distances.append(mean_median_distance) 
+        mean_max_distance = np.mean(max_distances)
+        epoch_max_distances.append(mean_max_distance) 
         
         mean_blur_val = np.mean(blur_vals)
         epoch_blur_vals.append(mean_blur_val)
@@ -292,7 +292,7 @@ def train_model_da(model,
         # Dynamic weighting logging only after warmup
         if epoch >= warmup and dynamic_weighting:
             print(f"Epoch: {epoch + 1}, sigma_1: {sigma_1.item():.4f}, sigma_2: {sigma_2.item():.4f}")
-            print(f"Epoch: {epoch + 1}, Max Distance: {median_distance:.4f}")
+            print(f"Epoch: {epoch + 1}, Max Distance: {max_distance:.4f}")
 
         # Adjust logging based on warmup phase
         if epoch < warmup:
@@ -339,9 +339,9 @@ def train_model_da(model,
                         
                         pairwise_distances = torch.cdist(source_features, target_features, p=2)
                         flattened_distances = pairwise_distances.view(-1)
-                        median_distance = torch.median(flattened_distances)
+                        max_distance = torch.max(flattened_distances)
 
-                        dynamic_blur_val = 0.05 * median_distance.detach().cpu().numpy()
+                        dynamic_blur_val = 0.05 * max_distance.detach().cpu().numpy()
                         domain_loss_ = sinkhorn_loss(source_features, 
                                                      target_features, 
                                                      blur=max(dynamic_blur_val, 0.01),  # Apply lower bound to blur
@@ -460,7 +460,7 @@ def train_model_da(model,
     np.save(os.path.join(loss_dir, f"val_classification_losses-{model_name}.npy"), np.array(val_classification_losses))
     np.save(os.path.join(loss_dir, f"val_domain_losses-{model_name}.npy"), np.array(val_domain_losses))
     np.save(os.path.join(loss_dir, f"steps-{model_name}.npy"), np.array(steps))
-    np.save(os.path.join(loss_dir, f"max_distances-{model_name}.npy"), np.array(median_distances))
+    np.save(os.path.join(loss_dir, f"max_distances-{model_name}.npy"), np.array(max_distances))
     np.save(os.path.join(loss_dir, f"blur_vals-{model_name}.npy"), np.array(blur_vals))
     np.save(os.path.join(loss_dir, f"js_distances-{model_name}.npy"), np.array(js_distances))
     
@@ -555,21 +555,38 @@ def main(config):
                                                gamma=config['parameters']['lr_decay']
                                             )
         
-    # Define transformations
+    # Define transformations (for blobs and shapes dataset)
+    # train_transform = transforms.Compose([
+    #     transforms.ToTensor(),
+    #     transforms.RandomRotation(180),
+    #     transforms.Resize(100),
+    #     transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
+    #     transforms.RandomHorizontalFlip(p=0.3),
+    #     transforms.RandomVerticalFlip(p=0.3),
+    #     transforms.Normalize(mean=(0.5, ), std=(0.5,))
+    # ])
+
+    # val_transform = transforms.Compose([
+    #     transforms.ToTensor(),
+    #     transforms.Normalize(mean=(0.5, ), std=(0.5,)),
+    #     transforms.Resize(100)
+    # ])
+    
+    ## define transformations for MNIST dataset
     train_transform = transforms.Compose([
         transforms.ToTensor(),
         transforms.RandomRotation(180),
-        transforms.Resize(100),
+        transforms.Resize(32),
         transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
         transforms.RandomHorizontalFlip(p=0.3),
         transforms.RandomVerticalFlip(p=0.3),
-        transforms.Normalize(mean=(0.5, ), std=(0.5,))
+        transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
     ])
-
+    
     val_transform = transforms.Compose([
         transforms.ToTensor(),
-        transforms.Normalize(mean=(0.5, ), std=(0.5,)),
-        transforms.Resize(100)
+        transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)),
+        transforms.Resize(32)
     ])
 
     # Function to split dataset into train and validation subsets
@@ -680,7 +697,7 @@ if __name__ == '__main__':
 
     device = ('cuda' if torch.cuda.is_available() else 'cpu')
         
-    set_all_seeds(1)
+    set_all_seeds(0)
 
     parser = argparse.ArgumentParser(description = 'Train the models')
     parser.add_argument('--config', metavar = 'config', required=True,
