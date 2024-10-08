@@ -206,6 +206,87 @@ class D4ConvNet(nn.Module):
         x = self.fc2(x)
 
         return latent_space, x
+    
+class D4ConvNet_MNISTM(nn.Module):
+    def __init__(self, num_classes=3):
+        super(D4ConvNet_MNISTM, self).__init__()
+
+        # D4 Group for 2D images
+        self.r2_act = gspaces.flipRot2dOnR2(N=4)  # D4 group with 4 rotations and flip
+
+        # First Convolutional Layer
+        self.input_type = escnn_nn.FieldType(self.r2_act, 3 * [self.r2_act.trivial_repr])
+        self.conv1 = escnn_nn.R2Conv(
+            in_type=self.input_type,
+            out_type=escnn_nn.FieldType(self.r2_act, 8 * [self.r2_act.regular_repr]),
+            kernel_size=5,
+            padding=2
+        )
+        self.bn1 = escnn_nn.InnerBatchNorm(self.conv1.out_type)
+        self.relu1 = escnn_nn.ReLU(self.conv1.out_type)
+        self.pool1 = escnn_nn.PointwiseMaxPool2D(self.conv1.out_type, kernel_size=2, stride=2, padding=0)
+        self.dropout1 = escnn_nn.PointwiseDropout(self.conv1.out_type, p=0.2)
+
+        # Second Convolutional Layer
+        self.conv2 = escnn_nn.R2Conv(
+            in_type=self.conv1.out_type,
+            out_type=escnn_nn.FieldType(self.r2_act, 16 * [self.r2_act.regular_repr]),
+            kernel_size=3,
+            padding=1
+        )
+
+        self.bn2 = escnn_nn.InnerBatchNorm(self.conv2.out_type)
+        self.relu2 = escnn_nn.ReLU(self.conv2.out_type)
+        self.pool2 = escnn_nn.PointwiseMaxPool2D(self.conv2.out_type, kernel_size=2, stride=2, padding=0)
+        self.dropout2 = escnn_nn.PointwiseDropout(self.conv2.out_type, p=0.2)
+
+        # Third Convolutional Layer
+        self.conv3 = escnn_nn.R2Conv(
+            in_type=self.conv2.out_type,
+            out_type=escnn_nn.FieldType(self.r2_act, 32 * [self.r2_act.regular_repr]),
+            kernel_size=3,
+            padding=1
+        )
+        self.bn3 = escnn_nn.InnerBatchNorm(self.conv3.out_type)
+        self.relu3 = escnn_nn.ReLU(self.conv3.out_type)
+        self.pool3 = escnn_nn.PointwiseMaxPool2D(self.conv3.out_type, kernel_size=2, stride=2, padding=0)
+        self.dropout3 = escnn_nn.PointwiseDropout(self.conv3.out_type, p=0.2)
+        
+        self.gpool = escnn_nn.GroupPooling(self.pool3.out_type)
+        
+        c = self.gpool.out_type.size
+        print(c)
+
+        self.fc1 = nn.Linear(in_features=16*c, out_features=256)
+        self.fc1.weight.data.normal_(0, .005)
+        self.fc1.bias.data.fill_(0.0)
+        self.layer_norm = nn.LayerNorm(256)
+
+        self.fc2 = nn.Linear(in_features=256, out_features=num_classes)
+        self.fc2.weight.data.normal_(0, 0.01)
+        self.fc2.bias.data.fill_(0.0)
+
+    def forward(self, x):
+        x = escnn_nn.GeometricTensor(x, self.input_type)
+        
+        x = self.pool1(self.relu1(self.bn1(self.conv1(x))))
+        x = self.dropout1(x)
+        x = self.pool2(self.relu2(self.bn2(self.conv2(x))))
+        x = self.dropout2(x)
+        x = self.pool3(self.relu3(self.bn3(self.conv3(x))))
+        x = self.dropout3(x)
+        
+        x = self.gpool(x)
+        
+        x = x.tensor.view(x.tensor.size(0), -1)
+        x = self.fc1(x)
+        x = self.layer_norm(x)
+        latent_space = x
+
+        x = self.fc2(x)
+        
+        return latent_space, x
+
 
 def cnn(num_classes):
     model = ConvNet(num_classes=num_classes)
@@ -217,6 +298,10 @@ def cnn_mnistm(num_classes):
 
 def d4_model(num_classes):
     model = D4ConvNet(num_classes=num_classes)
+    return model
+
+def d4_mnistm(num_classes):
+    model = D4ConvNet_MNISTM(num_classes=num_classes)
     return model
 
 
@@ -235,7 +320,7 @@ if __name__ == "__main__":
         print(table)
         print(f"Total Trainable Params: {total_params}")
         
-    model = cnn_mnistm(num_classes=10)
+    model = d4_mnistm(num_classes=10)
     print_model_parameters(model)
     # x = torch.randn(32, 1, 100 ,100)
     x = torch.randn(1, 3, 32, 32)
