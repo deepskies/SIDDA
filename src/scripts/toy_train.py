@@ -21,22 +21,21 @@ import torch
 import torch.nn.functional as F
 
 def kl_divergence(p, q):
-    # Add a small epsilon to avoid log(0) and division by zero
-    p = p + 1e-10
-    q = q + 1e-10
+    epsilon = 1e-6  # Larger epsilon to avoid numerical issues
+    p = torch.clamp(p, min=epsilon)
+    q = torch.clamp(q, min=epsilon)
     return torch.sum(p * torch.log(p / q), dim=-1)
 
 def jensen_shannon_divergence(p, q):
-    # Calculate the mean of the two distributions
     m = 0.5 * (p + q)
-    # Jensen-Shannon divergence is the average of KL divergences
     jsd = 0.5 * kl_divergence(p, m) + 0.5 * kl_divergence(q, m)
     return jsd
 
 def jensen_shannon_distance(p, q):
-    # Jensen-Shannon distance is the square root of the divergence
     jsd = jensen_shannon_divergence(p, q)
+    jsd = torch.clamp(jsd, min=0.0)  # Ensure no negative values
     return torch.sqrt(jsd)
+
 
 def sinkhorn_loss(x, 
                   y,
@@ -244,7 +243,7 @@ def train_model_da(model,
                 flattened_distances = pairwise_distances.view(-1)
                 max_distance = torch.max(flattened_distances)
                 max_distances.append(max_distance.detach().cpu().numpy())
-                js_distances.append(jensen_shannon_distance(source_features, target_features).mean().item())
+                js_distances.append(jensen_shannon_distance(source_features, target_features).nanmean().item())
 
                 dynamic_blur_val = 0.1 * max_distance.detach().cpu().numpy()
                 blur_vals.append(dynamic_blur_val)
@@ -279,7 +278,7 @@ def train_model_da(model,
         
         mean_blur_val = np.mean(blur_vals)
         epoch_blur_vals.append(mean_blur_val)
-        mean_js_distance = np.mean(js_distances)
+        mean_js_distance = np.nanmean(js_distances)
         epoch_js_distances.append(mean_js_distance)
 
         train_loss /= len(train_dataloader)
