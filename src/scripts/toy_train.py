@@ -244,7 +244,7 @@ def train_model_da(model,
                 flattened_distances = pairwise_distances.view(-1)
                 max_distance = torch.max(flattened_distances)
                 max_distances.append(max_distance.detach().cpu().numpy())
-                js_distances.append(jensen_shannon_distance(source_features, target_features).detach().cpu().numpy())
+                js_distances.append(jensen_shannon_distance(source_features, target_features).mean().item())
 
                 dynamic_blur_val = 0.1 * max_distance.detach().cpu().numpy()
                 blur_vals.append(dynamic_blur_val)
@@ -452,7 +452,7 @@ def train_model_da(model,
     loss_dir = os.path.join(save_dir, 'losses')
     if not os.path.exists(loss_dir):
         os.makedirs(loss_dir)
-        # Saving losses and steps
+        
     np.save(os.path.join(loss_dir, f"losses-{model_name}.npy"), np.array(losses))
     np.save(os.path.join(loss_dir, f"train_classification_losses-{model_name}.npy"), np.array(train_classification_losses))
     np.save(os.path.join(loss_dir, f"train_domain_losses-{model_name}.npy"), np.array(train_domain_losses))
@@ -536,6 +536,21 @@ def train_model_da(model,
     plt.yscale('log')
     plt.tight_layout()
     plt.savefig(os.path.join(loss_dir, f"blur_value_plot-{model_name}.png"))
+    plt.close()
+    
+    plt.figure(figsize=(10, 5))
+    
+    plt.plot(steps, js_distances)
+    plt.axvline(x=best_val_epoch, color='b', linestyle='--', label='Best Val Epoch')
+    plt.axvline(x=best_classification_loss_epoch, color='y', linestyle='--', label='Best Classification Epoch')
+    plt.axvline(x=best_domain_epoch, color='g', linestyle='--', label='Best Domain Epoch')
+    plt.legend()
+    plt.xlabel('Epochs')
+    plt.ylabel('JS Distance')
+    plt.title('JS Distance vs. Training Steps')
+    plt.yscale('log')
+    plt.tight_layout()
+    plt.savefig(os.path.join(loss_dir, f"js_distance_plot-{model_name}.png"))
     plt.close()
 
     return best_val_epoch, best_val_acc, best_classification_loss_epoch, best_classification_loss, best_domain_epoch, best_domain_loss, losses[-1]
