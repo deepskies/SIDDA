@@ -465,6 +465,10 @@ def train_model_da(model,
     np.save(os.path.join(loss_dir, f"max_distances-{model_name}.npy"), np.array(max_distances))
     np.save(os.path.join(loss_dir, f"blur_vals-{model_name}.npy"), np.array(blur_vals))
     np.save(os.path.join(loss_dir, f"js_distances-{model_name}.npy"), np.array(js_distances))
+    np.save(os.path.join(loss_dir, f"epoch_max_distances-{model_name}.npy"), np.array(epoch_max_distances))
+    np.save(os.path.join(loss_dir, f"epoch_blur_vals-{model_name}.npy"), np.array(epoch_blur_vals))
+    np.save(os.path.join(loss_dir, f"epoch_js_distances-{model_name}.npy"), np.array(epoch_js_distances))
+    
     
     # Plotting the losses
     plt.figure(figsize=(14, 8))
@@ -542,7 +546,7 @@ def train_model_da(model,
     
     plt.figure(figsize=(10, 5))
     
-    plt.plot(steps, js_distances)
+    plt.plot(steps, epoch_js_distances)
     plt.axvline(x=best_val_epoch, color='b', linestyle='--', label='Best Val Epoch')
     plt.axvline(x=best_classification_loss_epoch, color='y', linestyle='--', label='Best Classification Epoch')
     plt.axvline(x=best_domain_epoch, color='g', linestyle='--', label='Best Domain Epoch')
