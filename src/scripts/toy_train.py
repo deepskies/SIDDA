@@ -198,7 +198,7 @@ def train_model_da(model,
     train_classification_losses, train_domain_losses = [], []
     val_losses, val_classification_losses, val_domain_losses = [], [], []
     max_distances, epoch_max_distances = [], []
-    js_distances = []
+    js_distances, epoch_js_distances = [], []
     blur_vals, epoch_blur_vals = [], []
     
     print("Training Started!")
@@ -279,6 +279,8 @@ def train_model_da(model,
         
         mean_blur_val = np.mean(blur_vals)
         epoch_blur_vals.append(mean_blur_val)
+        mean_js_distance = np.mean(js_distances)
+        epoch_js_distances.append(mean_js_distance)
 
         train_loss /= len(train_dataloader)
         train_classification_loss = np.mean(classification_losses)
