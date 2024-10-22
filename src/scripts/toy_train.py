@@ -564,8 +564,8 @@ def main(config):
     num_classes = config['num_classes']
     # model = d4_model(num_classes) if config['model'] == 'D4' else cnn(num_classes)
     # model = d4_mnistm(num_classes) if config['model'] == 'D4' else cnn_mnistm(num_classes)
-    model = mmnistm_models(config['model'])(num_classes)
     model_name = str(config['model'])
+    model = mmnistm_models[model_name](num_classes=num_classes)
     params_to_optimize = [p for p in model.parameters() if p.requires_grad]
     optimizer = optim.AdamW(params_to_optimize, 
                             lr = config['parameters']['lr'], 
@@ -718,17 +718,16 @@ def main(config):
 if __name__ == '__main__':
 
     device = ('cuda' if torch.cuda.is_available() else 'cpu')
-        
-    set_all_seeds(0)
 
     parser = argparse.ArgumentParser(description = 'Train the models')
     parser.add_argument('--config', metavar = 'config', required=True,
                     help='Location of the config file')
 
     args = parser.parse_args()
-
-
+    
     with open(args.config, 'r') as f:
         config = yaml.safe_load(f)
+    
+    set_all_seeds(config['seed'])
 
     main(config)
