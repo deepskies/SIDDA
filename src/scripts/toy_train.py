@@ -11,7 +11,7 @@ from torch.nn import functional as F
 from torch import optim
 from torchvision import transforms
 # from toy_models import d4_model, feature_fields
-from toy_model_simple import cnn, d4_model, cnn_mnistm, d4_mnistm
+from toy_model_simple import cnn, d4_model, mmnistm_models
 from toy_dataset import Shapes, Blobs, MnistM
 from tqdm import tqdm
 import random
@@ -563,7 +563,8 @@ def train_model_da(model,
 def main(config):
     num_classes = config['num_classes']
     # model = d4_model(num_classes) if config['model'] == 'D4' else cnn(num_classes)
-    model = d4_mnistm(num_classes) if config['model'] == 'D4' else cnn_mnistm(num_classes)
+    # model = d4_mnistm(num_classes) if config['model'] == 'D4' else cnn_mnistm(num_classes)
+    model = mmnistm_models(config['model'])(num_classes)
     model_name = str(config['model'])
     params_to_optimize = [p for p in model.parameters() if p.requires_grad]
     optimizer = optim.AdamW(params_to_optimize, 

@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 import torch.nn as nn
 # from toy_models import d4_model
-from toy_model_simple import d4_model, cnn
+from toy_model_simple import d4_model, cnn, mnistm_models
 from toy_dataset import Shapes
 from utils import OnePixelAttack
 
@@ -33,8 +33,8 @@ def load_models(directory_path, model_name):
         if file_name.endswith('.pt'):
             file_path = os.path.join(directory_path, file_name)
             print(f'Loading {model_name} from {file_path}...')
-            
-            model = d4_model() if model_name == 'D4' else cnn()
+            model = mnistm_models[model_name](num_classes=10)
+            # model = d4_model() if model_name == 'D4' else cnn()
             model.eval()
             model.load_state_dict(torch.load(file_path, map_location=device))
             

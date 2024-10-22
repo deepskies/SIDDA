@@ -207,12 +207,18 @@ class D4ConvNet(nn.Module):
 
         return latent_space, x
     
-class D4ConvNet_MNISTM(nn.Module):
-    def __init__(self, num_classes=3):
-        super(D4ConvNet_MNISTM, self).__init__()
-
-        # D4 Group for 2D images
-        self.r2_act = gspaces.flipRot2dOnR2(N=4)  # D4 group with 4 rotations and flip
+class ENN_MNISTM(nn.Module):
+    def __init__(self, num_classes=3, N=1, dihedral=True):
+        super(ENN_MNISTM, self).__init__()
+        
+        if N==1:
+            self.r2_act = gspaces.trivialOnR2()  # D1 group and C1 group
+            
+        else:
+            if dihedral:
+                self.r2_act = gspaces.flipRot2dOnR2(N=N)  # D4 group with 4 rotations and flip
+            else:
+                self.r2_act = gspaces.rot2dOnR2(N=N)  # D4 group with 4 rotations and flip
 
         # First Convolutional Layer
         self.input_type = escnn_nn.FieldType(self.r2_act, 3 * [self.r2_act.trivial_repr])
@@ -255,7 +261,6 @@ class D4ConvNet_MNISTM(nn.Module):
         self.gpool = escnn_nn.GroupPooling(self.pool3.out_type)
         
         c = self.gpool.out_type.size
-        print(c)
 
         self.fc1 = nn.Linear(in_features=16*c, out_features=256)
         self.fc1.weight.data.normal_(0, .005)
@@ -300,10 +305,40 @@ def d4_model(num_classes):
     model = D4ConvNet(num_classes=num_classes)
     return model
 
-def d4_mnistm(num_classes):
-    model = D4ConvNet_MNISTM(num_classes=num_classes)
+def d1_mnistm(num_classes):
+    model = DNConvNet_MNISTM(num_classes=num_classes, N=1)
     return model
 
+def d2_mnistm(num_classes):
+    model = DNConvNet_MNISTM(num_classes=num_classes, N=2)
+    return model
+
+def d4_mnistm(num_classes):
+    model = DNConvNet_MNISTM(num_classes=num_classes, N=4)
+    return model
+
+def d8_mnistm(num_classes):
+    model = DNConvNet_MNISTM(num_classes=num_classes, N=8)
+    return model
+
+def c1_mnistm(num_classes):
+    model = DNConvNet_MNISTM(num_classes=num_classes, N=1, dihedral=False)
+    return model
+
+def c2_mnistm(num_classes):
+    model = DNConvNet_MNISTM(num_classes=num_classes, N=2, dihedral=False)
+    return model
+
+def c4_mnistm(num_classes):
+    model = DNConvNet_MNISTM(num_classes=num_classes, N=4, dihedral=False)
+    return model
+
+def c8_mnistm(num_classes):
+    model = DNConvNet_MNISTM(num_classes=num_classes, N=8, dihedral=False)
+    return model
+
+
+mmnistm_models =  {'c1': c1_mnistm, 'c2': c2_mnistm, 'c4': c4_mnistm, 'c8': c8_mnistm, 'd1': d1_mnistm, 'd2': d2_mnistm, 'd4': d4_mnistm, 'd8': d8_mnistm}
 
 if __name__ == "__main__":
     from prettytable import PrettyTable
@@ -320,7 +355,7 @@ if __name__ == "__main__":
         print(table)
         print(f"Total Trainable Params: {total_params}")
         
-    model = d4_mnistm(num_classes=10)
+    model = d2_mnistm(num_classes=10)
     print_model_parameters(model)
     # x = torch.randn(32, 1, 100 ,100)
     x = torch.randn(1, 3, 32, 32)
