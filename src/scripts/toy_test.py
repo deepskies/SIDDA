@@ -12,14 +12,14 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 import torch.nn as nn
 # from toy_models import d4_model
-from toy_model_simple import d4_model, cnn, mnistm_models
-from toy_dataset import Shapes
+from toy_model_simple import mnistm_models
+from toy_dataset import MnistM
 from utils import OnePixelAttack
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 classes = (
-    'lines', 'rectangles', 'circles'
+    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'
 )
 
 
@@ -106,18 +106,18 @@ def main(model_dir, output_name, x_test_path, y_test_path, model_name, N=None, a
     if adversarial_attack:
         transform = transforms.Compose([
             transforms.ToTensor(),
-            transforms.Resize(100),
-            transforms.Normalize(mean=(0.5,), std=(0.5,)),
+            transforms.Resize(32),
+            transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)),
             OnePixelAttack()
         ])
     else:
         transform = transforms.Compose([
             transforms.ToTensor(),
-            transforms.Normalize(mean=(0.5,), std=(0.5,)),
-            transforms.Resize(100)
+            transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)),
+            transforms.Resize(32)
         ])
 
-    test_dataset = Shapes(x_test_path, y_test_path, transform=transform)
+    test_dataset = MnistM(x_test_path, y_test_path, transform=transform)
     test_dataloader = DataLoader(test_dataset, batch_size=128, shuffle=True)
 
     models = load_models(model_dir, model_name)
