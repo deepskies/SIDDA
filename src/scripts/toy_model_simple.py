@@ -306,35 +306,35 @@ def d4_model(num_classes):
     return model
 
 def d1_mnistm(num_classes):
-    model = DNConvNet_MNISTM(num_classes=num_classes, N=1)
+    model = ENN_MNISTM(num_classes=num_classes, N=1)
     return model
 
 def d2_mnistm(num_classes):
-    model = DNConvNet_MNISTM(num_classes=num_classes, N=2)
+    model = ENN_MNISTM(num_classes=num_classes, N=2)
     return model
 
 def d4_mnistm(num_classes):
-    model = DNConvNet_MNISTM(num_classes=num_classes, N=4)
+    model = ENN_MNISTM(num_classes=num_classes, N=4)
     return model
 
 def d8_mnistm(num_classes):
-    model = DNConvNet_MNISTM(num_classes=num_classes, N=8)
+    model = ENN_MNISTM(num_classes=num_classes, N=8)
     return model
 
 def c1_mnistm(num_classes):
-    model = DNConvNet_MNISTM(num_classes=num_classes, N=1, dihedral=False)
+    model = ENN_MNISTM(num_classes=num_classes, N=1, dihedral=False)
     return model
 
 def c2_mnistm(num_classes):
-    model = DNConvNet_MNISTM(num_classes=num_classes, N=2, dihedral=False)
+    model = ENN_MNISTM(num_classes=num_classes, N=2, dihedral=False)
     return model
 
 def c4_mnistm(num_classes):
-    model = DNConvNet_MNISTM(num_classes=num_classes, N=4, dihedral=False)
+    model = ENN_MNISTM(num_classes=num_classes, N=4, dihedral=False)
     return model
 
 def c8_mnistm(num_classes):
-    model = DNConvNet_MNISTM(num_classes=num_classes, N=8, dihedral=False)
+    model = ENN_MNISTM(num_classes=num_classes, N=8, dihedral=False)
     return model
 
 
