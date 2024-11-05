@@ -53,17 +53,29 @@ def expected_calibration_error(y_true, y_proba, num_bins=10):
     bin_boundaries = np.linspace(0, 1, num_bins + 1)
     bin_lowers = bin_boundaries[:-1]
     bin_uppers = bin_boundaries[1:]
-
     ece = 0.0
+    total_samples = len(y_true)
+    
     for bin_lower, bin_upper in zip(bin_lowers, bin_uppers):
-        # Create a mask for probabilities within the current bin
-        in_bin = (y_proba > bin_lower) & (y_proba <= bin_upper)
+        # Initialize counters for the bin
+        bin_size = 0
+        bin_error = 0.0
         
-        # Check if any probabilities fall within this bin
-        if np.any(in_bin):
-            prob_true = np.mean([y_true[i] == np.argmax(y_proba[i]) for i in range(len(y_true)) if in_bin[i]])
-            prob_pred = np.mean(y_proba[in_bin])
-            ece += np.abs(prob_pred - prob_true) * np.mean(in_bin)
+        # Loop through each class (assuming y_proba is (n_samples, n_classes))
+        for i in range(total_samples):
+            # Get the predicted probability for the true class of the sample
+            prob_pred = y_proba[i, np.argmax(y_proba[i])]
+            
+            # Check if this probability falls into the current bin
+            if bin_lower < prob_pred <= bin_upper:
+                bin_size += 1
+                # Check if the prediction is correct
+                is_correct = (y_true[i] == np.argmax(y_proba[i]))
+                bin_error += np.abs(prob_pred - is_correct)
+        
+        # Update ECE with the weighted error for this bin
+        if bin_size > 0:
+            ece += bin_error / total_samples
     
     return ece
 
