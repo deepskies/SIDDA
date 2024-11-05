@@ -49,15 +49,22 @@ def load_models(directory_path, model_name):
 
 # Function to compute ECE
 def expected_calibration_error(y_true, y_proba, num_bins=10):
+    """Compute the Expected Calibration Error (ECE) for multi-class classification."""
     bin_boundaries = np.linspace(0, 1, num_bins + 1)
     bin_lowers = bin_boundaries[:-1]
     bin_uppers = bin_boundaries[1:]
+
     ece = 0.0
     for bin_lower, bin_upper in zip(bin_lowers, bin_uppers):
+        # Create a mask for probabilities within the current bin
         in_bin = (y_proba > bin_lower) & (y_proba <= bin_upper)
-        prob_true = np.mean(y_true[in_bin]) if np.any(in_bin) else 0
-        prob_pred = np.mean(y_proba[in_bin]) if np.any(in_bin) else 0
-        ece += np.abs(prob_pred - prob_true) * np.mean(in_bin)
+        
+        # Check if any probabilities fall within this bin
+        if np.any(in_bin):
+            prob_true = np.mean([y_true[i] == np.argmax(y_proba[i]) for i in range(len(y_true)) if in_bin[i]])
+            prob_pred = np.mean(y_proba[in_bin])
+            ece += np.abs(prob_pred - prob_true) * np.mean(in_bin)
+    
     return ece
 
 # Plot the reliability diagram
