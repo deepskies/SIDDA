@@ -92,7 +92,7 @@ def plot_calibration_curve(y_true, y_proba, num_bins=10):
     plt.title('Reliability Diagram')
     plt.grid()
     plt.show()
-
+    
 @torch.no_grad()
 def compute_metrics_with_calibration(test_loader, model, model_name, save_dir, output_name):
     y_pred, y_true, feature_maps, y_proba = [], [], [], []
@@ -144,12 +144,13 @@ def compute_metrics_with_calibration(test_loader, model, model_name, save_dir, o
     
     # Compute Brier score
     brier_scores = [brier_score_loss(y_true == i, calibrated_proba[:, i]) for i in range(calibrated_proba.shape[1])]
-    mean_brier_score = np.mean(brier_scores)
+    mean_brier_score = float(np.mean(brier_scores))  # Convert to Python float
     
     # Compute ECE
-    ece = expected_calibration_error(y_true, calibrated_proba)
+    ece = float(expected_calibration_error(y_true, calibrated_proba))  # Convert to Python float
     
     return sklearn_report, ece, mean_brier_score
+
 
 
 @torch.no_grad()
