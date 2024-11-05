@@ -6,35 +6,38 @@ import numpy as np
 import pandas as pd
 import seaborn as sn
 import matplotlib.pyplot as plt
-from sklearn.metrics import confusion_matrix, classification_report
+from sklearn.metrics import confusion_matrix, classification_report, brier_score_loss
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.linear_model import LogisticRegression
+from sklearn.calibration import calibration_curve
 from torchvision import transforms
+
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-import torch.nn as nn
 from toy_model_simple import mnistm_models
 from toy_dataset import MnistM
 from utils import OnePixelAttack
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-classes = (
-    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'
-)
-
+classes = ('0', '1', '2', '3', '4', '5', '6', '7', '8', '9')
 
 def load_models(directory_path, model_name):
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    
     models = []
     
+    # Search for files that contain 'best_model' and end with '.pt' in their names
     for file_name in os.listdir(directory_path):
         if file_name.endswith('.pt'):
             file_path = os.path.join(directory_path, file_name)
             print(f'Loading {model_name} from {file_path}...')
             model = mnistm_models[model_name](num_classes=10)
+            # model = d4_model() if model_name == 'D4' else cnn()
             model.eval()
             model.load_state_dict(torch.load(file_path, map_location=device))
             
+            # Remove the .pt extension for output file naming
             model_name_no_ext = file_name[:-3]
             models.append((model, model_name_no_ext))
             print(f'Finished Loading {model_name} from {file_path}')
@@ -44,6 +47,32 @@ def load_models(directory_path, model_name):
     
     return models
 
+# Function to compute ECE
+def expected_calibration_error(y_true, y_proba, num_bins=10):
+    bin_boundaries = np.linspace(0, 1, num_bins + 1)
+    bin_lowers = bin_boundaries[:-1]
+    bin_uppers = bin_boundaries[1:]
+    ece = 0.0
+    for bin_lower, bin_upper in zip(bin_lowers, bin_uppers):
+        in_bin = (y_proba > bin_lower) & (y_proba <= bin_upper)
+        prob_true = np.mean(y_true[in_bin]) if np.any(in_bin) else 0
+        prob_pred = np.mean(y_proba[in_bin]) if np.any(in_bin) else 0
+        ece += np.abs(prob_pred - prob_true) * np.mean(in_bin)
+    return ece
+
+# Plot the reliability diagram
+def plot_calibration_curve(y_true, y_proba, num_bins=10):
+    plt.figure(figsize=(10, 10))
+    for i in range(y_proba.shape[1]):
+        prob_true, prob_pred = calibration_curve(y_true == i, y_proba[:, i], n_bins=num_bins)
+        plt.plot(prob_pred, prob_true, marker='o', label=f'Class {i}')
+    plt.plot([0, 1], [0, 1], linestyle='--', label='Perfectly calibrated')
+    plt.xlabel('Mean Predicted Probability')
+    plt.ylabel('Fraction of Positives')
+    plt.legend(loc='best')
+    plt.title('Reliability Diagram')
+    plt.grid()
+    plt.show()
 
 @torch.no_grad()
 def compute_metrics_with_calibration(test_loader, model, model_name, save_dir, output_name):
@@ -57,7 +86,6 @@ def compute_metrics_with_calibration(test_loader, model, model_name, save_dir, o
         features, preds = model(input)
         probs = torch.softmax(preds, dim=1)
         feature_maps.extend(features.cpu().numpy())
-        
         y_pred.extend(torch.argmax(probs, dim=1).cpu().numpy())
         y_proba.extend(probs.cpu().numpy())
         y_true.extend(output.cpu().numpy())
@@ -73,7 +101,7 @@ def compute_metrics_with_calibration(test_loader, model, model_name, save_dir, o
     
     # Calibrate probabilities using sklearn
     print('Calibrating classification scores...')
-    calibrator = CalibratedClassifierCV(base_estimator=LogisticRegression(), method='sigmoid')
+    calibrator = CalibratedClassifierCV(estimator=LogisticRegression(), method='sigmoid')
     calibrator.fit(flattened_features, y_true)
     calibrated_proba = calibrator.predict_proba(flattened_features)
     
@@ -82,10 +110,10 @@ def compute_metrics_with_calibration(test_loader, model, model_name, save_dir, o
     os.makedirs(proba_dir, exist_ok=True)
     np.save(f"{proba_dir}/calibrated_proba_{model_name}_{output_name}.npy", calibrated_proba)
     
-    # Compute the classification report and confusion matrix with calibrated probabilities
+    # Compute classification metrics with calibrated probabilities
     y_pred_calibrated = np.argmax(calibrated_proba, axis=1)
     sklearn_report = classification_report(y_true, y_pred_calibrated, output_dict=True, target_names=classes)
-    
+
     # Confusion matrix
     cf_matrix = confusion_matrix(y_true, y_pred_calibrated)
     df_cm = pd.DataFrame(cf_matrix / np.sum(cf_matrix, axis=1)[:, None], index=[i for i in classes], columns=[i for i in classes])
@@ -95,7 +123,14 @@ def compute_metrics_with_calibration(test_loader, model, model_name, save_dir, o
     plt.savefig(os.path.join(save_dir, f"confusion_matrix_calibrated_{model_name}_{output_name}.png"), bbox_inches='tight')
     plt.close()
     
-    return sklearn_report
+    # Compute Brier score
+    brier_scores = [brier_score_loss(y_true == i, calibrated_proba[:, i]) for i in range(calibrated_proba.shape[1])]
+    mean_brier_score = np.mean(brier_scores)
+    
+    # Compute ECE
+    ece = expected_calibration_error(y_true, calibrated_proba)
+    
+    return sklearn_report, ece, mean_brier_score
 
 
 @torch.no_grad()
@@ -126,15 +161,21 @@ def main(model_dir, output_name, x_test_path, y_test_path, model_name, N=None, a
         return
     
     for model, model_file_name in models:
-        model_metrics = compute_metrics_with_calibration(test_loader=test_dataloader, model=model, 
-                                                         model_name=model_name, save_dir=model_dir, 
-                                                         output_name=output_name)
+        model_metrics, ece, brier_score = compute_metrics_with_calibration(
+            test_loader=test_dataloader, model=model, model_name=model_name, save_dir=model_dir, output_name=output_name
+        )
+
+        # Add ECE and Brier score to the metrics
+        model_metrics['ECE'] = ece
+        model_metrics['Brier Score'] = brier_score
+
         print('Compiling Metrics')
         output_file_name = f'{output_name}_{model_file_name}.yaml'
         with open(os.path.join(metrics_dir, output_file_name), 'w') as file:
             yaml.dump(model_metrics, file)
 
         print(f'Metrics saved at {os.path.join(metrics_dir, output_file_name)}')
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Evaluate models with calibration')
@@ -146,5 +187,4 @@ if __name__ == '__main__':
     parser.add_argument('--adversarial_attack', action='store_true', help='Apply adversarial attack to the input data')
     args = parser.parse_args()
     
-    main(model_dir=args.model_path, output_name=args.output_name, x_test_path=args.x_test_path, y_test_path=args.y_test_path, adversarial_attack=args.adversarial_attack,
-         model_name=args.model_name)
+    main(model_dir=args.model_path, output_name=args.output_name, x_test_path=args.x_test_path, y_test_path=args.y_test_path, adversarial_attack=args.adversarial_attack, model_name=args.model_name)
