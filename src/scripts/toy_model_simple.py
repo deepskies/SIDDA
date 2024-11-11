@@ -128,9 +128,9 @@ class ConvNet_MNISTM(nn.Module):
         
         return latent_space, x
     
-class D4ConvNet(nn.Module):
+class ENN(nn.Module):
     def __init__(self, num_classes=3):
-        super(D4ConvNet, self).__init__()
+        super(ENN, self).__init__()
 
         # D4 Group for 2D images
         self.r2_act = gspaces.flipRot2dOnR2(N=4)  # D4 group with 4 rotations and flip
@@ -297,12 +297,12 @@ def cnn(num_classes):
     model = ConvNet(num_classes=num_classes)
     return model
 
-def cnn_mnistm(num_classes):
-    model = ConvNet_MNISTM(num_classes=num_classes)
+def d4_model(num_classes):
+    model = ENN(num_classes=num_classes)
     return model
 
-def d4_model(num_classes):
-    model = D4ConvNet(num_classes=num_classes)
+def cnn_mnistm(num_classes):
+    model = ConvNet_MNISTM(num_classes=num_classes)
     return model
 
 def d1_mnistm(num_classes):
@@ -339,6 +339,7 @@ def c8_mnistm(num_classes):
 
 
 mnistm_models =  {'c1': c1_mnistm, 'c2': c2_mnistm, 'c4': c4_mnistm, 'c8': c8_mnistm, 'd1': d1_mnistm, 'd2': d2_mnistm, 'd4': d4_mnistm, 'd8': d8_mnistm, 'cnn': cnn_mnistm}
+shapes_models = {'cnn': cnn, 'd4': d4_model}
 
 if __name__ == "__main__":
     from prettytable import PrettyTable
