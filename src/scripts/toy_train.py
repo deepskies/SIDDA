@@ -11,8 +11,8 @@ from torch.nn import functional as F
 from torch import optim
 from torchvision import transforms
 # from toy_models import d4_model, feature_fields
-from toy_model_simple import cnn, d4_model, mnistm_models
-from toy_dataset import Shapes, Blobs, MnistM
+from toy_model_simple import evo_models
+from toy_dataset import Shapes, Blobs, MnistM, GZEvo
 from tqdm import tqdm
 import random
 import geomloss
@@ -565,7 +565,7 @@ def main(config):
     # model = d4_model(num_classes) if config['model'] == 'D4' else cnn(num_classes)
     # model = d4_mnistm(num_classes) if config['model'] == 'D4' else cnn_mnistm(num_classes)
     model_name = str(config['model'])
-    model = mnistm_models[model_name](num_classes=num_classes)
+    model = evo_models[model_name](num_classes=num_classes)
     params_to_optimize = [p for p in model.parameters() if p.requires_grad]
     optimizer = optim.AdamW(params_to_optimize, 
                             lr = config['parameters']['lr'], 
@@ -576,23 +576,6 @@ def main(config):
                                                milestones = config['parameters']['milestones'],
                                                gamma=config['parameters']['lr_decay']
                                             )
-        
-    # Define transformations (for blobs and shapes dataset)
-    # train_transform = transforms.Compose([
-    #     transforms.ToTensor(),
-    #     transforms.RandomRotation(180),
-    #     transforms.Resize(100),
-    #     transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
-    #     transforms.RandomHorizontalFlip(p=0.3),
-    #     transforms.RandomVerticalFlip(p=0.3),
-    #     transforms.Normalize(mean=(0.5, ), std=(0.5,))
-    # ])
-
-    # val_transform = transforms.Compose([
-    #     transforms.ToTensor(),
-    #     transforms.Normalize(mean=(0.5, ), std=(0.5,)),
-    #     transforms.Resize(100)
-    # ])
     
     ## define transformations for MNIST dataset
     train_transform = transforms.Compose([
@@ -628,7 +611,7 @@ def main(config):
     start = time.time()
 
     # Load source dataset
-    train_dataset = MnistM(input_path=config['train_data']['input_path'], 
+    train_dataset = GZEvo(input_path=config['train_data']['input_path'], 
                         output_path=config['train_data']['output_path'], 
                         transform=train_transform)
 
@@ -640,7 +623,7 @@ def main(config):
 
     if config['DA']:
         # Load target dataset
-        target_dataset = MnistM(input_path=config['train_data']['target_input_path'], 
+        target_dataset = GZEvo(input_path=config['train_data']['target_input_path'], 
                                 output_path=config['train_data']['target_output_path'], 
                                 transform=train_transform)
         

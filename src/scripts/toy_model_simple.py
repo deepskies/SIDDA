@@ -339,6 +339,7 @@ def c8_mnistm(num_classes):
 
 
 mnistm_models =  {'c1': c1_mnistm, 'c2': c2_mnistm, 'c4': c4_mnistm, 'c8': c8_mnistm, 'd1': d1_mnistm, 'd2': d2_mnistm, 'd4': d4_mnistm, 'd8': d8_mnistm, 'cnn': cnn_mnistm}
+evo_models = {'cnn': cnn, 'd4': d4_model}
 
 if __name__ == "__main__":
     from prettytable import PrettyTable
