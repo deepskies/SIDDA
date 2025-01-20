@@ -54,7 +54,7 @@ def load_models(directory_path: str, model_name: str) -> list:
 
 @torch.no_grad()
 def compute_metrics(
-    test_loader: nn.DataLoader,
+    test_loader: DataLoader,
     model: nn.Module,
     model_name: str,
     save_dir: str,
@@ -257,17 +257,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model_name", type=str, help="Name of the model to be evaluated"
     )
-    parser.add_argument(
-        "--adversarial_attack",
-        action="store_true",
-        help="Apply adversarial attack to the input data",
-    )
-    parser.add_argument(
-        "--dataset",
-        type=str,
-        default="gz_evo",
-        help="Dataset to be used for evaluation",
-    )
+    
     args = parser.parse_args()
 
     main(
