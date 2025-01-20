@@ -575,9 +575,8 @@ def train_SIDDA(
 
 
 def main(config):
-    num_classes = config["num_classes"]
     model_name = str(config["model"])
-    model = model_dict[config["dataset"]][model_name](num_classes=num_classes)
+    model = model_dict[config["dataset"]][model_name]()
 
     params_to_optimize = [p for p in model.parameters() if p.requires_grad]
     optimizer = optim.AdamW(

@@ -85,8 +85,8 @@ python test.py \
 The test script will save:
   - a sklearn classification report for all saved models in the directory (`/dir/metrics`)
   - source and target domain latent vectors for each model on the whole test set (`/dir/latent_vectors`). This can later be used to plot isomaps for the models.
-  - model predictions for each model on the whole test set (`dir/y_pred`)
-  - confusion matrices for each model on the whole test set (`dir/confusion_matrix`)
+  - model predictions for each model over the whole test set (`dir/y_pred`)
+  - confusion matrices for each model over the whole test set (`dir/confusion_matrix`)
 
 The calibration test script will further save:
   - calibrated confusion matrices
