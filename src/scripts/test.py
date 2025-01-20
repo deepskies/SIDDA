@@ -232,7 +232,7 @@ def main(
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Evaluate Galaxy10 models")
+    parser = argparse.ArgumentParser(description="Test models")
     parser.add_argument(
         "--dataset",
         type=str,
@@ -265,7 +265,6 @@ if __name__ == "__main__":
         output_name=args.output_name,
         x_test_path=args.x_test_path,
         y_test_path=args.y_test_path,
-        adversarial_attack=args.adversarial_attack,
         model_name=args.model_name,
         classes=classes_dict[args.dataset],
     )
