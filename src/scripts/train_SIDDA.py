@@ -592,10 +592,7 @@ def main(config):
         gamma=config["parameters"]["lr_decay"],
     )
 
-    if (
-        dataset_dict[dataset_name] == "shapes"
-        or dataset_dict[dataset_name] == "astro_objects"
-    ):
+    if dataset_name in ["shapes", "astro_objects"]:
         train_transform = transforms.Compose(
             [
                 transforms.ToTensor(),
@@ -615,7 +612,7 @@ def main(config):
                 transforms.Resize(100),
             ]
         )
-    elif dataset_dict[dataset_name] == "mnist_m":
+    elif dataset_name == "mnist_m":
         train_transform = transforms.Compose(
             [
                 transforms.ToTensor(),
@@ -636,7 +633,7 @@ def main(config):
             ]
         )
 
-    elif dataset_dict[dataset_name] == "gz_evo":
+    elif dataset_name == "gz_evo":
         train_transform = transforms.Compose(
             [
                 transforms.ToTensor(),
