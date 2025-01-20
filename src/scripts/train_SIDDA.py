@@ -575,8 +575,8 @@ def train_SIDDA(
 
 
 def main(config):
-    model_name = str(config["model"])
-    dataset_name = str(config["dataset"])
+    model_name = str(config["model"]).strip()
+    dataset_name = str(config["dataset"]).strip()
     model = model_dict[dataset_name][model_name]()
 
     params_to_optimize = [p for p in model.parameters() if p.requires_grad]
@@ -737,7 +737,6 @@ def main(config):
         val_dataloader=val_dataloader,
         target_dataloader=target_dataloader,
         target_val_dataloader=target_val_dataloader,
-        scale_factor=config["parameters"]["scale_factor"],
         optimizer=optimizer,
         model_name=model_name,
         scheduler=scheduler,
