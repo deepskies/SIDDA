@@ -683,6 +683,7 @@ def main(config):
     target_dataset = dataset_dict[dataset_name](
         input_path=config["train_data"]["target_input_path"],
         transform=train_transform,
+        target_domain = True,
     )
 
     target_dataset, val_target_dataset = split_dataset(
