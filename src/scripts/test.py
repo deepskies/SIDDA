@@ -147,7 +147,7 @@ def main(
     if not os.path.exists(metrics_dir):
         os.makedirs(metrics_dir)
 
-    if dataset_dict[dataset] == "shapes" or dataset_dict[dataset] == "astro_objects":
+    if dataset in ["shapes", "astronomical_objects"]:
         transform = transforms.Compose(
             [
                 transforms.ToTensor(),
@@ -160,7 +160,7 @@ def main(
             ]
         )
 
-    elif dataset_dict[dataset] == "mnist_m":
+    elif dataset == "mnist_m":
         transform = transforms.Compose(
             [
                 transforms.ToTensor(),
@@ -173,7 +173,7 @@ def main(
             ]
         )
 
-    elif dataset_dict[dataset] == "gz_evo":
+    elif dataset == "gz_evo":
         transform = transforms.Compose(
             [
                 transforms.ToTensor(),
@@ -186,7 +186,7 @@ def main(
             ]
         )
 
-    test_dataset = dataset_dict["gz_evo"](x_test_path, y_test_path, transform=transform)
+    test_dataset = dataset_dict[dataset](x_test_path, y_test_path, transform=transform)
     test_dataloader = DataLoader(test_dataset, batch_size=128, shuffle=True)
 
     models = load_models(model_dir, model_name)
