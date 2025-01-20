@@ -576,7 +576,7 @@ def train_SIDDA(
 
 def main(config):
     model_name = str(config["model"])
-    model = model_dict[config["dataset"]][model_name]()
+    model = model_dict[str(config["dataset"])][model_name]()
 
     params_to_optimize = [p for p in model.parameters() if p.requires_grad]
     optimizer = optim.AdamW(
@@ -592,7 +592,7 @@ def main(config):
     )
 
     if (
-        dataset_dict[config["dataset"]] == "shapes"
+        dataset_dict[str(config["dataset"])] == "shapes"
         or dataset_dict[config["dataset"]] == "astro_objects"
     ):
         train_transform = transforms.Compose(
@@ -614,7 +614,7 @@ def main(config):
                 transforms.Resize(100),
             ]
         )
-    elif dataset_dict[config["dataset"]] == "mnist_m":
+    elif dataset_dict[str(config["dataset"])] == "mnist_m":
         train_transform = transforms.Compose(
             [
                 transforms.ToTensor(),
@@ -635,7 +635,7 @@ def main(config):
             ]
         )
 
-    elif dataset_dict[config["dataset"]] == "gz_evo":
+    elif dataset_dict[str(config["dataset"])] == "gz_evo":
         train_transform = transforms.Compose(
             [
                 transforms.ToTensor(),
@@ -669,7 +669,7 @@ def main(config):
 
     print("Loading datasets!")
     start = time.time()
-    train_dataset = dataset_dict[config["dataset"]](
+    train_dataset = dataset_dict[str(config["dataset"])](
         input_path=config["train_data"]["input_path"],
         output_path=config["train_data"]["output_path"],
         transform=train_transform,
@@ -682,7 +682,7 @@ def main(config):
         val_transform=val_transform,
     )
 
-    target_dataset = dataset_dict[config["dataset"]](
+    target_dataset = dataset_dict[str(config["dataset"])](
         input_path=config["train_data"]["target_input_path"],
         transform=train_transform,
     )
