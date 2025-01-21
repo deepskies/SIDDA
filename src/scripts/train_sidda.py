@@ -10,7 +10,6 @@ from torch import nn
 from torch.nn import functional as F
 from torch import optim
 from torchvision import transforms
-# from toy_models import d4_model, feature_fields
 from models import model_dict
 from dataset import Shapes
 from tqdm import tqdm
@@ -538,7 +537,6 @@ def main(config):
                                                                                                                                                 val_dataloader=val_dataloader,
                                                                                                                                                 target_dataloader=target_dataloader,
                                                                                                                                                 target_val_dataloader=target_val_dataloader,
-                                                                                                                                                scale_factor=config['parameters']['scale_factor'],
                                                                                                                                                 optimizer=optimizer, 
                                                                                                                                                 model_name=model_name, 
                                                                                                                                                 scheduler=scheduler, 
