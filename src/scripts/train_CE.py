@@ -149,7 +149,8 @@ def train_model(
 
 
 def main(config):
-    model_name = str(config["model"])
+    model_name = str(config["model"]).strip()
+    dataset_name = str(config["dataset"]).strip()
     model = model_dict[config["dataset"]][model_name]()
 
     params_to_optimize = [p for p in model.parameters() if p.requires_grad]
@@ -165,10 +166,7 @@ def main(config):
         gamma=config["parameters"]["lr_decay"],
     )
 
-    if (
-        dataset_dict[config["dataset"]] == "shapes"
-        or dataset_dict[config["dataset"]] == "astro_objects"
-    ):
+    if dataset_name in ["shapes", "astro_objects"]:
         train_transform = transforms.Compose(
             [
                 transforms.ToTensor(),
@@ -188,7 +186,7 @@ def main(config):
                 transforms.Resize(100),
             ]
         )
-    elif dataset_dict[config["dataset"]] == "mnist_m":
+    elif dataset_name == "mnist_m":
         train_transform = transforms.Compose(
             [
                 transforms.ToTensor(),
@@ -209,7 +207,7 @@ def main(config):
             ]
         )
 
-    elif dataset_dict[config["dataset"]] == "gz_evo":
+    elif dataset_name == "gz_evo":
         train_transform = transforms.Compose(
             [
                 transforms.ToTensor(),
@@ -245,7 +243,7 @@ def main(config):
 
     print("Loading datasets!")
     start = time.time()
-    train_dataset = dataset_dict[config["dataset"]](
+    train_dataset = dataset_dict[dataset_name](
         input_path=config["train_data"]["input_path"],
         output_path=config["train_data"]["output_path"],
         transform=train_transform,
