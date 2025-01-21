@@ -143,8 +143,6 @@ def train_model_da(model,
                     source_features, 
                     target_features, 
                     blur=max(dynamic_blur_val, 0.01),  # Apply lower bound to blur
-                    scaling=config['parameters']['scaling'],
-                    reach=None
                 )
 
                 loss = (1 / (2 * sigma_1**2)) * classification_loss + (1 / (2 * sigma_2**2)) * domain_loss + torch.log(torch.abs(sigma_1) * torch.abs(sigma_2))
