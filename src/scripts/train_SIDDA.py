@@ -153,7 +153,7 @@ def train_SIDDA(
                     source_features,
                     target_features,
                     blur=max(dynamic_blur_val, 0.01),
-                    scaling=config["parameters"]["scaling"],
+                    scaling= 0.9,
                     reach=None,
                 )
 
