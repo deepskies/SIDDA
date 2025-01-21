@@ -213,7 +213,7 @@ def train_SIDDA(
 
         if (epoch + 1) % report_interval == 0:
             model.eval()
-            source_correct, target_correct, source_total, target_total, val_loss = (
+            source_correct, _, source_total, _, val_loss = (
                 0,
                 0,
                 0,
@@ -231,10 +231,10 @@ def train_SIDDA(
                         source_inputs.to(device).float(),
                         source_outputs.to(device),
                     )
-                    target_inputs, target_outputs = target_batch
-                    target_inputs, target_outputs = (
+                    target_inputs, _ = target_batch
+                    target_inputs, _ = (
                         target_inputs.to(device).float(),
-                        target_outputs.to(device),
+                        _.to(device),
                     )
 
                     if epoch < warmup:
@@ -244,7 +244,7 @@ def train_SIDDA(
                         )
                         combined_loss = classification_loss_
                         DA_loss_ = 0.0
-                        target_preds = None
+                        # target_preds = None
 
                     else:
                         concatenated_inputs = torch.cat(
@@ -256,7 +256,7 @@ def train_SIDDA(
                         source_features = features[:batch_size]
                         target_features = features[batch_size:]
                         source_preds = preds[:batch_size]
-                        target_preds = preds[batch_size:]
+                        # target_preds = preds[batch_size:]
 
                         classification_loss_ = F.cross_entropy(
                             source_preds, source_outputs
@@ -277,11 +277,11 @@ def train_SIDDA(
 
                         combined_loss = classification_loss_ + DA_loss_
 
-                        _, target_predicted = torch.max(target_preds.data, 1)
-                        target_total += target_outputs.size(0)
-                        target_correct += (
-                            (target_predicted == target_outputs).sum().item()
-                        )
+                        # _, target_predicted = torch.max(target_preds.data, 1)
+                        # target_total += target_outputs.size(0)
+                        # target_correct += (
+                        #     (target_predicted == target_outputs).sum().item()
+                        # )
 
                     val_loss += combined_loss.item()
                     val_classification_loss += classification_loss_.item()
@@ -295,10 +295,10 @@ def train_SIDDA(
 
             source_val_acc = 100 * source_correct / source_total
 
-            if target_total > 0:
-                target_val_acc = 100 * target_correct / target_total
-            else:
-                target_val_acc = 0.0
+            # if target_total > 0:
+            #     target_val_acc = 100 * target_correct / target_total
+            # else:
+            #     target_val_acc = 0.0
 
             val_loss /= len(val_dataloader)
             val_classification_loss /= len(val_dataloader)
@@ -325,7 +325,8 @@ def train_SIDDA(
                 )
             else:
                 print(
-                    f"Epoch: {epoch + 1}, Total Validation Loss: {val_loss:.4f}, Source Validation Accuracy: {source_val_acc:.2f}%, Learning rate: {lr}, Target Validation Accuracy: {target_val_acc:.2f}%"
+                    f"Epoch: {epoch + 1}, Total Validation Loss: {val_loss:.4f}, Source Validation Accuracy: {source_val_acc:.2f}%, Learning rate: {lr}"
+                    # , Target Validation Accuracy: {target_val_acc:.2f}%"
                 )
                 print(
                     f"Epoch: {epoch + 1}, Validation Classification Loss: {val_classification_loss:.4e}, Validation DA Loss: {val_DA_loss:.4e}"
