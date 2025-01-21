@@ -49,12 +49,12 @@ def expected_calibration_error(
 
 @torch.no_grad()
 def compute_metrics_with_calibration(
-    test_loader: nn.DataLoader,
+    test_loader: DataLoader,
     model: nn.Module,
     model_name: str,
     save_dir: str,
     output_name: str,
-    classes: list,
+    classes: tuple,
 ) -> tuple:
     """Compute metrics for a model with calibration
 
@@ -252,7 +252,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model_name", type=str, help="Name of the model to be evaluated"
     )
-    parser.add_argumetn(
+    parser.add_argument(
         "--classes", type=str, nargs="+", help="List of classes to be evaluated"
     )
     parser.add_argument(
