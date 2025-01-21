@@ -267,4 +267,5 @@ if __name__ == "__main__":
         y_test_path=args.y_test_path,
         model_name=args.model_name,
         classes=classes_dict[args.dataset],
+        dataset = args.dataset
     )
