@@ -1,22 +1,22 @@
 model : d4
-dataset: "gz_evo"
+dataset: "shapes"
 train_data :
-        input_path : /path/to/source/domain/images
-        output_path : /path/to/source/domain/labels
-        target_input_path: /path/to/target/domain/images
+  input_path : /n/holystore01/LABS/iaifi_lab/Users/spandya/GCNN_DA/toy_dataset_shapes_new/x_train.npy
+  output_path : /n/holystore01/LABS/iaifi_lab/Users/spandya/GCNN_DA/toy_dataset_shapes_new/y_train.npy
+  target_input_path: /n/holystore01/LABS/iaifi_lab/Users/spandya/GCNN_DA/toy_dataset_shapes_new/x_train_noisy.npy
+  target_output_path: /n/holystore01/LABS/iaifi_lab/Users/spandya/GCNN_DA/toy_dataset_shapes_new/y_train_noisy.npy
 
 parameters :
   lr : 1.0e-2
   weight_decay : 1.0e-3
   val_size : 0.2
   batch_size : 128
-  epochs : 60
-  early_stopping : 20
-  report_interval : 5
+  epochs : 50
+  early_stopping : 50
+  report_interval : 1
   lr_decay : 0.1
-  milestones : [ 30, 45 ]
-  warmup: 20
-DA: True
-seed: 0
+  milestones : [ 25, 40 ]
+  warmup: 5
+seed: 10
 
-save_dir : /path/to/save/model
+save_dir : /n/holystore01/LABS/iaifi_lab/Users/spandya/GCNN_DA/shapes
