@@ -122,7 +122,7 @@ def compute_metrics_with_calibration(
     plt.title(f"{model_name} Calibrated Confusion Matrix")
     plt.savefig(
         os.path.join(
-            save_dir, f"confusion_matrix_calibrated_{model_name}_{output_name}.png"
+            save_dir, f"confusion_matrix/confusion_matrix_calibrated_{model_name}_{output_name}.png"
         ),
         bbox_inches="tight",
     )
