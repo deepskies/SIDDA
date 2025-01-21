@@ -103,6 +103,16 @@ The calibration test script will further save:
 
   These notebooks walk through the data generation procedure for simulated datasets (shapes and astronomical objects), inducing covariate shifts (for shapes, astronomical objects, and MNIST-M), and properly loading the galaxy evo dataset.
 
+- **Paper Plots**
+  - `src/paper_notebooks/plotting_isomaps.ipynb`
+  - `src/paper_notebooks/plotting_js_distances.ipynb`
+
+These notebooks can be used to reproduce Figures 4 and 5 in the paper. The data can be found on our Zenodo page.
+
+### Code Authors
+
+- Sneh Pandya
+
 ## Citation
 
 ```bibtex
