@@ -153,7 +153,7 @@ def train_SIDDA(
                     source_features,
                     target_features,
                     blur=max(dynamic_blur_val, 0.01),
-                    scaling= 0.9,
+                    scaling = 0.9,
                     reach=None,
                 )
 
@@ -172,7 +172,7 @@ def train_SIDDA(
             train_loss += loss.item()
             classification_losses.append(classification_loss.item())
             if epoch >= warmup:
-                DA_loss.append(DA_loss.item())
+                DA_losses.append(DA_loss.item())
 
         mean_max_distance = np.mean(max_distances)
         epoch_max_distances.append(mean_max_distance)
@@ -273,7 +273,7 @@ def train_SIDDA(
                             blur=max(
                                 dynamic_blur_val, 0.01
                             ), 
-                            scaling=config["parameters"]["scaling"],
+                            scaling = 0.9,
                             reach=None,
                         )
 
