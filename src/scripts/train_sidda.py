@@ -230,9 +230,7 @@ def train_model_da(model,
                         dynamic_blur_val = 0.05 * max_distance.detach().cpu().numpy()
                         domain_loss_ = sinkhorn_loss(source_features, 
                                                      target_features, 
-                                                     blur=max(dynamic_blur_val, 0.01),  # Apply lower bound to blur
-                                                     scaling=config['parameters']['scaling'], 
-                                                     reach=None
+                                                     blur=max(dynamic_blur_val, 0.01)  # Apply lower bound to blur 
                                                 )
                         
                         combined_loss = classification_loss_ + domain_loss_
