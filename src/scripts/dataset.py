@@ -28,8 +28,7 @@ class Shapes(Dataset):
 
         try:
             self.img = np.load(self.input_path)
-            if not self.target_domain and self.output_path is not None:
-                self.label = np.load(self.output_path)
+            self.label = np.load(self.output_path)
         except Exception as e:
             raise RuntimeError(
                 f"Error loading data from {input_path} and {output_path}: {e}"
