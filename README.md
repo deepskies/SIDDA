@@ -69,7 +69,7 @@ The repository is organized into the following components:
   python train_SIDDA.py --config example_yaml_train_SIDDA.yaml
   ```
 
-After training, the training results are dumped into a directory <save_dir> which can be specified in the yaml file. The outputted directory has the following naming convention: `<save_dir>_model_(DA)_timestr>. The directory includes the best-epoch model, final model, loss curve(s) and data, and a config.yaml file with numerical specifics (best epoch, best loss, etc.) saved. 
+After training, the training results are dumped into a directory <save_dir> which can be specified in the yaml file. The outputted directory has the following naming convention: `<savedir_model_(DA)_timestr>`. The directory includes the best-epoch model, final model, loss curve(s) data, $\sigma_\ell$ values, JS distances, and a config.yaml file with numerical specifics (best epoch, best loss, etc.) saved. 
 
 To test the model, run
 
@@ -89,9 +89,9 @@ The test script will save:
   - confusion matrices for each model over the whole test set (`dir/confusion_matrix`)
 
 The calibration test script will further save:
-  - calibrated confusion matrices
-  - calibrated probabilities on the whole test set
-  - Expected calibration error (ECE) and Brier scores
+  - calibrated confusion matrices 
+  - calibrated probabilities on the whole test set (`dir/calibrated_probs`)
+  - Expected calibration error (ECE) and Brier scores (`dir/metrics`)
 
 ## Notebooks
 
