@@ -45,9 +45,6 @@ class Shapes(Dataset):
         if self.transform:
             img = self.transform(img)
 
-        if self.target_domain:
-            return img
-
         label = torch.tensor(self.label[idx], dtype=torch.long)
         return img, label
 
