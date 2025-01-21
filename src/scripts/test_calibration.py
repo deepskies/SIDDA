@@ -214,7 +214,7 @@ def main(model_dir: str,
         model_metrics, ece, brier_score = compute_metrics_with_calibration(
             test_loader=test_dataloader,
             model=model,
-            model_name=model_name,
+            model_name=model_file_name,
             save_dir=model_dir,
             output_name=output_name,
             classes=classes,
