@@ -18,7 +18,9 @@ from tqdm import tqdm
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def load_models(directory_path: str, model_name: str) -> list:
+def load_models(directory_path: str, 
+                model_name: str,
+                dataset_name: str) -> list:
     """Load models from a directory
 
     Args:
@@ -36,7 +38,7 @@ def load_models(directory_path: str, model_name: str) -> list:
         if file_name.endswith(".pt"):
             file_path = os.path.join(directory_path, file_name)
             print(f"Loading {model_name} from {file_path}...")
-            model = model_dict[model_name]()
+            model = model_dict[dataset_name][model_name]()
             model.eval()
             model.load_state_dict(torch.load(file_path, map_location=device))
 
@@ -189,7 +191,7 @@ def main(
     test_dataset = dataset_dict[dataset](x_test_path, y_test_path, transform=transform)
     test_dataloader = DataLoader(test_dataset, batch_size=128, shuffle=True)
 
-    models = load_models(model_dir, model_name)
+    models = load_models(model_dir, model_name, dataset)
     if not models:
         print("Models could not be loaded.")
         return
