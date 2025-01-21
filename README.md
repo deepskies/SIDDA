@@ -89,7 +89,7 @@ The test script will save:
   - confusion matrices for each model over the whole test set (`dir/confusion_matrix`)
 
 The calibration test script will further save:
-  - calibrated confusion matrices 
+  - calibrated confusion matrices (`dir/confusion_matrix`)
   - calibrated probabilities on the whole test set (`dir/calibrated_probs`)
   - Expected calibration error (ECE) and Brier scores (`dir/metrics`)
 
