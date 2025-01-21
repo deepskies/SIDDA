@@ -21,7 +21,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Function to compute ECE
 def expected_calibration_error(
-    y_true: np.ndarray, y_proba: np.ndarray, num_bins: int
+    y_true: np.ndarray, y_probs: np.ndarray, num_bins: int
 ) -> float:
     """Compute the Expected Calibration Error (ECE) for multi-class classification."""
     bin_boundaries = np.linspace(0, 1, num_bins + 1)
@@ -35,11 +35,11 @@ def expected_calibration_error(
         bin_error = 0.0
 
         for i in range(total_samples):
-            prob_pred = y_proba[i, np.argmax(y_proba[i])]
+            prob_pred = y_probs[i, np.argmax(y_probs[i])]
 
             if bin_lower < prob_pred <= bin_upper:
                 bin_size += 1
-                is_correct = y_true[i] == np.argmax(y_proba[i])
+                is_correct = y_true[i] == np.argmax(y_probs[i])
                 bin_error += np.abs(prob_pred - is_correct)
 
         if bin_size > 0:
@@ -146,6 +146,7 @@ def main(model_dir: str,
          y_test_path: str,
          model_name: str,
          classes: list,
+         dataset: str
     ) -> None:
     """Main function to evaluate models with calibration
 
@@ -160,20 +161,51 @@ def main(model_dir: str,
     metrics_dir = os.path.join(model_dir, "metrics")
     os.makedirs(metrics_dir, exist_ok=True)
 
-    transform = transforms.Compose(
-        [
-            transforms.ToTensor(),
-            transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)),
-            transforms.Resize(32),
-        ]
-    )
+    if dataset in ["shapes", "astronomical_objects"]:
+        transform = transforms.Compose(
+            [
+                transforms.ToTensor(),
+                transforms.RandomRotation(180),
+                transforms.Resize(100),
+                transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
+                transforms.RandomHorizontalFlip(p=0.3),
+                transforms.RandomVerticalFlip(p=0.3),
+                transforms.Normalize(mean=(0.5,), std=(0.5,)),
+            ]
+        )
+
+    elif dataset == "mnist_m":
+        transform = transforms.Compose(
+            [
+                transforms.ToTensor(),
+                transforms.RandomRotation(180),
+                transforms.Resize(32),
+                transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
+                transforms.RandomHorizontalFlip(p=0.3),
+                transforms.RandomVerticalFlip(p=0.3),
+                transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)),
+            ]
+        )
+
+    elif dataset == "gz_evo":
+        transform = transforms.Compose(
+            [
+                transforms.ToTensor(),
+                transforms.RandomRotation(180),
+                transforms.Resize(100),
+                transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
+                transforms.RandomHorizontalFlip(p=0.3),
+                transforms.RandomVerticalFlip(p=0.3),
+                transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)),
+            ]
+        )
 
     test_dataset = dataset_dict[model_name](
         x_test_path, y_test_path, transform=transform
     )
     test_dataloader = DataLoader(test_dataset, batch_size=128, shuffle=True)
 
-    models = load_models(model_dir, model_name)
+    models = load_models(model_dir, model_name, dataset)
     if not models:
         print("Models could not be loaded.")
         return
@@ -220,13 +252,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model_name", type=str, help="Name of the model to be evaluated"
     )
-    parser.add_argument(
-        "--adversarial_attack",
-        action="store_true",
-        help="Apply adversarial attack to the input data",
-    )
     parser.add_argumetn(
         "--classes", type=str, nargs="+", help="List of classes to be evaluated"
+    )
+    parser.add_argument(
+        "--dataset",
+        type=str,
+        default="gz_evo",
+        help="Dataset to be used for evaluation",
     )
     args = parser.parse_args()
 
@@ -235,7 +268,7 @@ if __name__ == "__main__":
         output_name=args.output_name,
         x_test_path=args.x_test_path,
         y_test_path=args.y_test_path,
-        adversarial_attack=args.adversarial_attack,
         model_name=args.model_name,
         classes=classes_dict[args.dataset],
+        dataset = args.dataset
     )
