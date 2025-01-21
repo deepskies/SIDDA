@@ -1,4 +1,5 @@
 model : cnn
+dataset: "shapes"
 train_data :
         input_path : /path/to/source/domain/images
         output_path : /path/to/source/domain/labels
@@ -15,7 +16,6 @@ parameters :
   milestones : [ 30, 45 ]
   warmup: 10
 DA: False
-num_classes: 3
 seed: 0
 
 save_dir : /path/to/save/model

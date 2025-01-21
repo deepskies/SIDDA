@@ -1,4 +1,5 @@
 model : d4
+dataset: "gz_evo"
 train_data :
         input_path : /path/to/source/domain/images
         output_path : /path/to/source/domain/labels
@@ -16,7 +17,6 @@ parameters :
   milestones : [ 30, 45 ]
   warmup: 20
 DA: True
-num_classes: 6
 seed: 0
 
 save_dir : /path/to/save/model
