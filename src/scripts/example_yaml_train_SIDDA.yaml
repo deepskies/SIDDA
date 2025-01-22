@@ -1,10 +1,10 @@
 model : d4
 dataset: "shapes"
 train_data :
-  input_path : /n/holystore01/LABS/iaifi_lab/Users/spandya/GCNN_DA/toy_dataset_shapes_new/x_train.npy
-  output_path : /n/holystore01/LABS/iaifi_lab/Users/spandya/GCNN_DA/toy_dataset_shapes_new/y_train.npy
-  target_input_path: /n/holystore01/LABS/iaifi_lab/Users/spandya/GCNN_DA/toy_dataset_shapes_new/x_train_noisy.npy
-  target_output_path: /n/holystore01/LABS/iaifi_lab/Users/spandya/GCNN_DA/toy_dataset_shapes_new/y_train_noisy.npy
+  input_path : /path/to/source/domain/images
+  output_path : /path/to/source/domain/labels
+  target_input_path: /path/to/target/domain/images
+  target_output_path: /path/to/target/domain/labels (not used during training, if not available can use None or empty array)
 
 parameters :
   lr : 1.0e-2
@@ -19,4 +19,4 @@ parameters :
   warmup: 5
 seed: 10
 
-save_dir : /n/holystore01/LABS/iaifi_lab/Users/spandya/GCNN_DA/shapes
+save_dir : /path/to/save/model

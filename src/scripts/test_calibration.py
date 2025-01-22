@@ -165,12 +165,8 @@ def main(model_dir: str,
         transform = transforms.Compose(
             [
                 transforms.ToTensor(),
-                transforms.RandomRotation(180),
-                transforms.Resize(100),
-                transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
-                transforms.RandomHorizontalFlip(p=0.3),
-                transforms.RandomVerticalFlip(p=0.3),
                 transforms.Normalize(mean=(0.5,), std=(0.5,)),
+                transforms.Resize(100),
             ]
         )
 
@@ -178,12 +174,8 @@ def main(model_dir: str,
         transform = transforms.Compose(
             [
                 transforms.ToTensor(),
-                transforms.RandomRotation(180),
-                transforms.Resize(32),
-                transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
-                transforms.RandomHorizontalFlip(p=0.3),
-                transforms.RandomVerticalFlip(p=0.3),
                 transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)),
+                transforms.Resize(32),
             ]
         )
 
@@ -191,12 +183,8 @@ def main(model_dir: str,
         transform = transforms.Compose(
             [
                 transforms.ToTensor(),
-                transforms.RandomRotation(180),
-                transforms.Resize(100),
-                transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
-                transforms.RandomHorizontalFlip(p=0.3),
-                transforms.RandomVerticalFlip(p=0.3),
                 transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)),
+                transforms.Resize(100),
             ]
         )
 
@@ -235,6 +223,12 @@ def main(model_dir: str,
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Evaluate models with calibration")
     parser.add_argument(
+        "--dataset",
+        type=str,
+        default="gz_evo",
+        help="Dataset to be used for evaluation",
+    )
+    parser.add_argument(
         "--model_path", type=str, required=True, help="Path to the trained models"
     )
     parser.add_argument(
@@ -252,15 +246,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model_name", type=str, help="Name of the model to be evaluated"
     )
-    parser.add_argument(
-        "--classes", type=str, nargs="+", help="List of classes to be evaluated"
-    )
-    parser.add_argument(
-        "--dataset",
-        type=str,
-        default="gz_evo",
-        help="Dataset to be used for evaluation",
-    )
+
     args = parser.parse_args()
 
     main(

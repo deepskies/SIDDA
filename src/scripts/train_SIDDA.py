@@ -36,10 +36,12 @@ def jensen_shannon_distance(p, q):
     return torch.sqrt(jsd)
 
 
-def sinkhorn_loss(x, y, blur, scaling, reach):
-    loss = geomloss.SamplesLoss(
-        loss="sinkhorn", blur=blur, scaling=scaling, reach=reach
-    )
+def sinkhorn_loss(
+    x,
+    y,
+    blur,
+):
+    loss = geomloss.SamplesLoss("sinkhorn", blur=blur, scaling=0.9, reach=None)
     return loss(x, y)
 
 
@@ -78,7 +80,7 @@ def train_SIDDA(
 
     warmup = config["parameters"]["warmup"]
     print("Model Loaded to Device!")
-    best_val_acc, best_classification_loss, best_domain_loss, best_total_val_loss = (
+    best_val_acc, best_classification_loss, best_DA_loss, best_total_val_loss = (
         0,
         float("inf"),
         float("inf"),
@@ -86,8 +88,8 @@ def train_SIDDA(
     )
     no_improvement_count = 0
     losses, steps = [], []
-    train_classification_losses, train_domain_losses = [], []
-    val_losses, val_classification_losses, val_domain_losses = [], [], []
+    train_classification_losses, train_DA_losses = [], []
+    val_losses, val_classification_losses, val_DA_losses = [], [], []
     max_distances, epoch_max_distances = [], []
     js_distances, epoch_js_distances = [], []
     blur_vals, epoch_blur_vals = [], []
@@ -113,7 +115,7 @@ def train_SIDDA(
                 source_outputs.to(device),
             )
 
-            target_inputs = target_batch
+            target_inputs, _ = target_batch
             target_inputs = target_inputs.to(device).float()
 
             optimizer.zero_grad()
@@ -152,9 +154,7 @@ def train_SIDDA(
                 DA_loss = sinkhorn_loss(
                     source_features,
                     target_features,
-                    blur=max(dynamic_blur_val, 0.01),
-                    scaling = 0.9,
-                    reach=None,
+                    blur=max(dynamic_blur_val, 0.01),  # Apply lower bound to blur
                 )
 
                 loss = (
@@ -184,20 +184,19 @@ def train_SIDDA(
 
         train_loss /= len(train_dataloader)
         train_classification_loss = np.mean(classification_losses)
-        train_domain_loss = np.mean(DA_losses) if DA_losses else None
+        train_DA_loss = np.mean(DA_losses) if DA_losses else None
 
         losses.append(train_loss)
         train_classification_losses.append(train_classification_loss)
-        train_domain_losses.append(train_domain_loss)
+        train_DA_losses.append(train_DA_loss)
         steps.append(epoch + 1)
 
         if epoch >= warmup:
             print(
-                f"Epoch: {epoch + 1}, sigma_1: {eta_1.item():.4f}, sigma_2: {eta_2.item():.4f}"
+                f"Epoch: {epoch + 1}, eta_1: {eta_1.item():.4f}, eta_2: {eta_2.item():.4f}"
             )
             print(f"Epoch: {epoch + 1}, Max Distance: {max_distance:.4f}")
 
-        # Adjust logging based on warmup phase
         if epoch < warmup:
             print(f"Epoch: {epoch + 1}, Train Loss: {train_loss:.4e}")
             print(
@@ -206,7 +205,7 @@ def train_SIDDA(
         else:
             print(f"Epoch: {epoch + 1}, Train Loss: {train_loss:.4e}")
             print(
-                f"Epoch: {epoch + 1}, Classification Loss: {train_classification_loss:.4e}, Domain Loss: {train_domain_loss:.4e}"
+                f"Epoch: {epoch + 1}, Classification Loss: {train_classification_loss:.4e}, DA Loss: {train_DA_loss:.4e}"
             )
 
         if scheduler is not None:
@@ -214,14 +213,12 @@ def train_SIDDA(
 
         if (epoch + 1) % report_interval == 0:
             model.eval()
-            source_correct, target_correct, source_total, target_total, val_loss = (
-                0,
-                0,
+            source_correct, source_total, val_loss = (
                 0,
                 0,
                 0.0,
             )
-            val_classification_loss, val_domain_loss = 0.0, 0.0
+            val_classification_loss, val_DA_loss = 0.0, 0.0
 
             with torch.no_grad():
                 for i, (batch, target_batch) in enumerate(
@@ -232,8 +229,11 @@ def train_SIDDA(
                         source_inputs.to(device).float(),
                         source_outputs.to(device),
                     )
-                    target_inputs = target_batch
-                    target_inputs = target_inputs.to(device).float()
+                    target_inputs, _ = target_batch
+                    target_inputs, _ = (
+                        target_inputs.to(device).float(),
+                        _.to(device),
+                    )
 
                     if epoch < warmup:
                         _, source_preds = model(source_inputs)
@@ -241,8 +241,7 @@ def train_SIDDA(
                             source_preds, source_outputs
                         )
                         combined_loss = classification_loss_
-                        domain_loss_ = 0.0 
-                        target_preds = None 
+                        DA_loss_ = 0.0
 
                     else:
                         concatenated_inputs = torch.cat(
@@ -254,7 +253,6 @@ def train_SIDDA(
                         source_features = features[:batch_size]
                         target_features = features[batch_size:]
                         source_preds = preds[:batch_size]
-                        target_preds = preds[batch_size:]
 
                         classification_loss_ = F.cross_entropy(
                             source_preds, source_outputs
@@ -267,27 +265,19 @@ def train_SIDDA(
                         max_distance = torch.max(flattened_distances)
 
                         dynamic_blur_val = 0.05 * max_distance.detach().cpu().numpy()
-                        domain_loss_ = sinkhorn_loss(
+                        DA_loss_ = sinkhorn_loss(
                             source_features,
                             target_features,
-                            blur=max(
-                                dynamic_blur_val, 0.01
-                            ), 
-                            scaling = 0.9,
-                            reach=None,
+                            blur=max(dynamic_blur_val, 0.01),
                         )
 
-                        combined_loss = classification_loss_ + domain_loss_
-
-                        _, target_predicted = torch.max(target_preds.data, 1)
+                        combined_loss = classification_loss_ + DA_loss_
 
                     val_loss += combined_loss.item()
                     val_classification_loss += classification_loss_.item()
 
                     if epoch >= warmup:
-                        val_domain_loss += (
-                            domain_loss_.item()
-                        ) 
+                        val_DA_loss += DA_loss_.item()
 
                     _, source_predicted = torch.max(source_preds.data, 1)
                     source_total += source_outputs.size(0)
@@ -299,13 +289,11 @@ def train_SIDDA(
             val_classification_loss /= len(val_dataloader)
 
             if epoch >= warmup:
-                val_domain_loss /= len(
-                    val_dataloader
-                )  
+                val_DA_loss /= len(val_dataloader)
 
             val_losses.append(val_loss)
             val_classification_losses.append(val_classification_loss)
-            val_domain_losses.append(val_domain_loss)
+            val_DA_losses.append(val_DA_loss)
 
             lr = (
                 scheduler.get_last_lr()[0]
@@ -325,7 +313,7 @@ def train_SIDDA(
                     f"Epoch: {epoch + 1}, Total Validation Loss: {val_loss:.4f}, Source Validation Accuracy: {source_val_acc:.2f}%, Learning rate: {lr}"
                 )
                 print(
-                    f"Epoch: {epoch + 1}, Validation Classification Loss: {val_classification_loss:.4e}, Validation Domain Loss: {val_domain_loss:.4e}"
+                    f"Epoch: {epoch + 1}, Validation Classification Loss: {val_classification_loss:.4e}, Validation DA Loss: {val_DA_loss:.4e}"
                 )
 
             if val_loss < best_total_val_loss and epoch >= warmup:
@@ -372,16 +360,15 @@ def train_SIDDA(
                     f"Saved lowest classification loss model at epoch {best_classification_loss_epoch}"
                 )
 
-            # Check and save the model with lowest domain loss
-            if val_domain_loss <= best_domain_loss and epoch >= warmup:
-                best_domain_loss = val_domain_loss
-                best_domain_epoch = epoch + 1
-                model_path = os.path.join(save_dir, "best_model_domain_loss.pt")
+            if val_DA_loss <= best_DA_loss and epoch >= warmup:
+                best_DA_loss = val_DA_loss
+                best_DA_epoch = epoch + 1
+                model_path = os.path.join(save_dir, "best_model_DA_loss.pt")
                 if torch.cuda.device_count() > 1:
                     torch.save(model.eval().module.state_dict(), model_path)
                 else:
                     torch.save(model.eval().state_dict(), model_path)
-                print(f"Saved lowest domain loss model at epoch {best_domain_epoch}")
+                print(f"Saved lowest DA loss model at epoch {best_DA_epoch}")
 
             if no_improvement_count >= early_stopping_patience:
                 print(
@@ -406,8 +393,8 @@ def train_SIDDA(
         np.array(train_classification_losses),
     )
     np.save(
-        os.path.join(loss_dir, f"train_domain_losses-{model_name}.npy"),
-        np.array(train_domain_losses),
+        os.path.join(loss_dir, f"train_DA_losses-{model_name}.npy"),
+        np.array(train_DA_losses),
     )
     np.save(
         os.path.join(loss_dir, f"val_losses-{model_name}.npy"), np.array(val_losses)
@@ -417,8 +404,8 @@ def train_SIDDA(
         np.array(val_classification_losses),
     )
     np.save(
-        os.path.join(loss_dir, f"val_domain_losses-{model_name}.npy"),
-        np.array(val_domain_losses),
+        os.path.join(loss_dir, f"val_DA_losses-{model_name}.npy"),
+        np.array(val_DA_losses),
     )
     np.save(os.path.join(loss_dir, f"steps-{model_name}.npy"), np.array(steps))
     np.save(
@@ -449,16 +436,16 @@ def train_SIDDA(
     validation_steps = steps[::report_interval]
     losses = np.array(losses)
     train_classification_losses = np.array(train_classification_losses)
-    train_domain_losses = np.array(train_domain_losses)
+    train_DA_losses = np.array(train_DA_losses)
     val_losses = np.array(val_losses)
     val_classification_losses = np.array(val_classification_losses)
-    val_domain_losses = np.array(val_domain_losses)
+    val_DA_losses = np.array(val_DA_losses)
 
     # Plot Training Losses
     plt.subplot(2, 1, 1)
     plt.plot(steps, losses, label="Train Total Loss")
     plt.plot(steps, train_classification_losses, label="Train Classification Loss")
-    plt.plot(steps, train_domain_losses, label="Train Domain Loss")
+    plt.plot(steps, train_DA_losses, label="Train DA Loss")
     plt.axvline(x=best_val_epoch, color="b", linestyle="--", label="Best Val Epoch")
     plt.axvline(
         x=best_classification_loss_epoch,
@@ -466,9 +453,7 @@ def train_SIDDA(
         linestyle="--",
         label="Best Classification Epoch",
     )
-    plt.axvline(
-        x=best_domain_epoch, color="g", linestyle="--", label="Best Domain Epoch"
-    )
+    plt.axvline(x=best_DA_epoch, color="g", linestyle="--", label="Best DA Epoch")
     plt.legend()
     plt.xlabel("Epochs")
     plt.ylabel("Loss")
@@ -484,7 +469,7 @@ def train_SIDDA(
         val_classification_losses,
         label="Validation Classification Loss",
     )
-    plt.plot(validation_steps, val_domain_losses, label="Validation Domain Loss")
+    plt.plot(validation_steps, val_DA_losses, label="Validation DA Loss")
     plt.xlabel("Epochs")
     plt.ylabel("Loss")
     plt.title("Validation Losses")
@@ -505,9 +490,7 @@ def train_SIDDA(
         linestyle="--",
         label="Best Classification Epoch",
     )
-    plt.axvline(
-        x=best_domain_epoch, color="g", linestyle="--", label="Best Domain Epoch"
-    )
+    plt.axvline(x=best_DA_epoch, color="g", linestyle="--", label="Best DA Epoch")
     plt.legend()
     plt.xlabel("Epochs")
     plt.ylabel("Max Distance")
@@ -529,9 +512,7 @@ def train_SIDDA(
         linestyle="--",
         label="Best Classification Epoch",
     )
-    plt.axvline(
-        x=best_domain_epoch, color="g", linestyle="--", label="Best Domain Epoch"
-    )
+    plt.axvline(x=best_DA_epoch, color="g", linestyle="--", label="Best DA Epoch")
     plt.legend()
     plt.xlabel("Epochs")
     plt.ylabel("Blur Value")
@@ -551,9 +532,7 @@ def train_SIDDA(
         linestyle="--",
         label="Best Classification Epoch",
     )
-    plt.axvline(
-        x=best_domain_epoch, color="g", linestyle="--", label="Best Domain Epoch"
-    )
+    plt.axvline(x=best_DA_epoch, color="g", linestyle="--", label="Best DA Epoch")
     plt.legend()
     plt.xlabel("Epochs")
     plt.ylabel("JS Distance")
@@ -568,8 +547,8 @@ def train_SIDDA(
         best_val_acc,
         best_classification_loss_epoch,
         best_classification_loss,
-        best_domain_epoch,
-        best_domain_loss,
+        best_DA_epoch,
+        best_DA_loss,
         losses[-1],
     )
 
@@ -577,7 +556,7 @@ def train_SIDDA(
 def main(config):
     model_name = str(config["model"]).strip()
     dataset_name = str(config["dataset"]).strip()
-    model = model_dict[dataset_name][model_name]()
+    model = model_dict["shapes"][model_name]()
 
     params_to_optimize = [p for p in model.parameters() if p.requires_grad]
     optimizer = optim.AdamW(
@@ -654,12 +633,14 @@ def main(config):
             ]
         )
 
+    # Function to split dataset into train and validation subsets
     def split_dataset(dataset, val_size, train_transform, val_transform):
         val_size = int(len(dataset) * val_size)
         train_size = len(dataset) - val_size
 
         train_subset, val_subset = random_split(dataset, [train_size, val_size])
 
+        # Apply transforms
         train_subset.dataset.transform = train_transform
         val_subset.dataset.transform = val_transform
 
@@ -667,12 +648,15 @@ def main(config):
 
     print("Loading datasets!")
     start = time.time()
+
+    # Load source dataset
     train_dataset = dataset_dict[dataset_name](
         input_path=config["train_data"]["input_path"],
         output_path=config["train_data"]["output_path"],
         transform=train_transform,
     )
 
+    # Split source dataset into train and validation sets
     train_dataset, val_dataset = split_dataset(
         train_dataset,
         val_size=config["parameters"]["val_size"],
@@ -680,12 +664,16 @@ def main(config):
         val_transform=val_transform,
     )
 
+    # Load target dataset
     target_dataset = dataset_dict[dataset_name](
         input_path=config["train_data"]["target_input_path"],
+        output_path=config["train_data"][
+            "target_output_path"
+        ],  ## outputs dont get used in training
         transform=train_transform,
-        target_domain = True,
     )
 
+    # Split target dataset into train and validation sets
     target_dataset, val_target_dataset = split_dataset(
         target_dataset,
         val_size=config["parameters"]["val_size"],
@@ -693,6 +681,10 @@ def main(config):
         val_transform=val_transform,
     )
 
+    end = time.time()
+    print(f"Datasets loaded and split in {end - start} seconds")
+
+    # Dataloaders can be created if needed
     train_dataloader = DataLoader(
         train_dataset,
         batch_size=config["parameters"]["batch_size"],
@@ -705,6 +697,7 @@ def main(config):
         shuffle=False,
         pin_memory=True,
     )
+
     target_dataloader = DataLoader(
         target_dataset,
         batch_size=config["parameters"]["batch_size"],
@@ -718,9 +711,6 @@ def main(config):
         pin_memory=True,
     )
 
-    end = time.time()
-    print(f"Datasets loaded and split in {end - start} seconds")
-
     timestr = time.strftime("%Y%m%d-%H%M%S")
 
     save_dir = config["save_dir"] + config["model"] + "_DA_" + timestr
@@ -729,8 +719,8 @@ def main(config):
         best_val_acc,
         best_classification_epoch,
         best_classification_loss,
-        best_domain_epoch,
-        best_domain_loss,
+        best_DA_epoch,
+        best_DA_loss,
         final_loss,
     ) = train_SIDDA(
         model=model,
@@ -751,11 +741,10 @@ def main(config):
     config["best_val_acc"] = best_val_acc
     config["best_val_epoch"] = best_val_epoch
     config["final_loss"] = float(final_loss)
-    # config['feature_fields'] = feature_fields
     config["best_classification_epoch"] = best_classification_epoch
     config["best_classification_loss"] = best_classification_loss
-    config["best_domain_epoch"] = best_domain_epoch
-    config["best_domain_loss"] = best_domain_loss
+    config["best_DA_epoch"] = best_DA_epoch
+    config["best_DA_loss"] = best_DA_loss
 
     file = open(f"{save_dir}/config.yaml", "w")
     yaml.dump(config, file)

@@ -82,6 +82,8 @@ python test.py \
 --model_name "type of model (D_4 or CNN)"
 ```
 
+The calibration testing script takes all the same arguments as above.
+
 The test script will save:
   - a sklearn classification report for all saved models in the directory (`/dir/metrics`)
   - source and target domain latent vectors for each model on the whole test set (`/dir/latent_vectors`). This can later be used to plot isomaps for the models.
