@@ -12,7 +12,7 @@
 SIDDA introduces a **semi-supervised, automatic domain adaptation method** that leverages Sinkhorn divergences to dynamically adjust the regularization in the optimal transport plan and the weighting between classification and domain adaptation loss terms during training. 
 
 ### Key Features:
-- **Minimal hyperparameter tuning**: SIDDA utilizes information from the NN latent space geometry to dynamically adjust the OT plan during training.
+- **Minimal hyperparameter tuning**: SIDDA utilizes information from the NN latent space geometry to dynamically adjust the OT plan during training. Loss coefficients are trainable parameters, bypassing the need for tuning loss terms when training with domain adaptation.
 - **Extensive validation**: Tested on synthetic and real-world datasets, including:
   - Synthetic shapes and astronomical objects generated with [DeepBench](https://github.com/deepskies/DeepBench).
   - The [MNIST-M](https://paperswithcode.com/dataset/mnist-m) dataset.
