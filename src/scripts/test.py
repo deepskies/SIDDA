@@ -153,12 +153,8 @@ def main(
         transform = transforms.Compose(
             [
                 transforms.ToTensor(),
-                transforms.RandomRotation(180),
-                transforms.Resize(100),
-                transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
-                transforms.RandomHorizontalFlip(p=0.3),
-                transforms.RandomVerticalFlip(p=0.3),
                 transforms.Normalize(mean=(0.5,), std=(0.5,)),
+                transforms.Resize(100),
             ]
         )
 
@@ -166,12 +162,8 @@ def main(
         transform = transforms.Compose(
             [
                 transforms.ToTensor(),
-                transforms.RandomRotation(180),
-                transforms.Resize(32),
-                transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
-                transforms.RandomHorizontalFlip(p=0.3),
-                transforms.RandomVerticalFlip(p=0.3),
                 transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)),
+                transforms.Resize(32),
             ]
         )
 
@@ -179,12 +171,8 @@ def main(
         transform = transforms.Compose(
             [
                 transforms.ToTensor(),
-                transforms.RandomRotation(180),
-                transforms.Resize(100),
-                transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
-                transforms.RandomHorizontalFlip(p=0.3),
-                transforms.RandomVerticalFlip(p=0.3),
                 transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)),
+                transforms.Resize(100),
             ]
         )
 
