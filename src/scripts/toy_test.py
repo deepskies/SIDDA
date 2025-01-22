@@ -12,8 +12,9 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 import torch.nn as nn
 # from toy_models import d4_model
-from toy_model_simple import shapes_models
-from toy_dataset import Shapes
+from models import model_dict
+from dataset import dataset_dict
+# from toy_dataset import Shapes
 from utils import OnePixelAttack
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -31,7 +32,7 @@ def load_models(directory_path, model_name):
         if file_name.endswith('.pt'):
             file_path = os.path.join(directory_path, file_name)
             print(f'Loading {model_name} from {file_path}...')
-            model = shapes_models[model_name](num_classes=3)
+            model = model_dict['shapes'][model_name]()
             model.eval()
             model.load_state_dict(torch.load(file_path, map_location=device))
             
@@ -114,7 +115,7 @@ def main(model_dir, output_name, x_test_path, y_test_path, model_name, N=None, a
          transforms.Resize(100)
      ])
 
-    test_dataset = Shapes(x_test_path, y_test_path, transform=transform)
+    test_dataset = dataset_dict['shapes'](x_test_path, y_test_path, transform=transform)
     test_dataloader = DataLoader(test_dataset, batch_size=128, shuffle=True)
 
     models = load_models(model_dir, model_name)
