@@ -1,0 +1,22 @@
+model : d4
+dataset: "shapes"
+train_data :
+  input_path : /path/to/source/domain/images
+  output_path : /path/to/source/domain/labels
+  target_input_path: /path/to/target/domain/images
+  target_output_path: /path/to/target/domain/labels (not used during training, if not available can use None or empty array)
+
+parameters :
+  lr : 1.0e-2
+  weight_decay : 1.0e-3
+  val_size : 0.2
+  batch_size : 128
+  epochs : 50
+  early_stopping : 50
+  report_interval : 1
+  lr_decay : 0.1
+  milestones : [ 25, 40 ]
+  warmup: 5
+seed: 10
+
+save_dir : /path/to/save/model

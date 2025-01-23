@@ -1,0 +1,21 @@
+model : cnn
+dataset: "shapes"
+train_data :
+        input_path : /path/to/source/domain/images
+        output_path : /path/to/source/domain/labels
+
+parameters :
+  lr : 1.0e-2
+  weight_decay : 1.0e-3
+  val_size : 0.2
+  batch_size : 128
+  epochs : 100
+  early_stopping : 20
+  report_interval : 5
+  lr_decay : 0.1
+  milestones : [ 30, 45 ]
+  warmup: 10
+DA: False
+seed: 0
+
+save_dir : /path/to/save/model

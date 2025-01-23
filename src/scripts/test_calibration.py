@@ -9,61 +9,54 @@ import torch
 import torch.nn as nn
 import yaml
 from dataset import classes_dict, dataset_dict
-from models import model_dict
-from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.calibration import CalibratedClassifierCV
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import brier_score_loss, classification_report, confusion_matrix
+from test import load_models
 from torch.utils.data import DataLoader
 from torchvision import transforms
 from tqdm import tqdm
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+# Function to compute ECE
+def expected_calibration_error(
+    y_true: np.ndarray, y_probs: np.ndarray, num_bins: int = 10
+) -> float:
+    """Compute the Expected Calibration Error (ECE) for multi-class classification."""
+    bin_boundaries = np.linspace(0, 1, num_bins + 1)
+    bin_lowers = bin_boundaries[:-1]
+    bin_uppers = bin_boundaries[1:]
+    ece = 0.0
+    total_samples = len(y_true)
 
-def load_models(directory_path: str, 
-                model_name: str,
-                dataset_name: str) -> list:
-    """Load models from a directory
+    for bin_lower, bin_upper in zip(bin_lowers, bin_uppers):
+        bin_size = 0
+        bin_error = 0.0
 
-    Args:
-        directory_path (str): directory with the trained models
-        model_name (str): name of the model to be loaded (following the model_dict)
+        for i in range(total_samples):
+            prob_pred = y_probs[i, np.argmax(y_probs[i])]
 
-    Returns:
-        loaded models (list): list of loaded models
-    """
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+            if bin_lower < prob_pred <= bin_upper:
+                bin_size += 1
+                is_correct = y_true[i] == np.argmax(y_probs[i])
+                bin_error += np.abs(prob_pred - is_correct)
 
-    models = []
+        if bin_size > 0:
+            ece += bin_error / total_samples
 
-    for file_name in os.listdir(directory_path):
-        if file_name.endswith(".pt"):
-            file_path = os.path.join(directory_path, file_name)
-            print(f"Loading {model_name} from {file_path}...")
-            model = model_dict[dataset_name][model_name]()
-            model.eval()
-            model.load_state_dict(torch.load(file_path, map_location=device))
-
-            model_name_no_ext = file_name[:-3]
-            models.append((model, model_name_no_ext))
-            print(f"Finished Loading {model_name} from {file_path}")
-
-    if not models:
-        print(
-            f"No models containing 'best_model' ending with '.pt' found in {directory_path}."
-        )
-
-    return models
-
+    return ece
 
 @torch.no_grad()
-def compute_metrics(
+def compute_metrics_with_calibration(
     test_loader: DataLoader,
     model: nn.Module,
     model_name: str,
     save_dir: str,
     output_name: str,
     classes: tuple,
-):
-    """Compute metrics for the model
+) -> tuple:
+    """Compute metrics for a model with calibration
 
     Args:
         test_loader (nn.DataLoader): test data loader
@@ -71,51 +64,54 @@ def compute_metrics(
         model_name (str): name of the model
         save_dir (str): directory to save the results
         output_name (str): name of the output file
-        classes (tuple): classes to be evaluated
+        classes (list): list of classes
 
     Returns:
-        sklearn_report (dict): sklearn classification report
+        _type_: _description_
     """
-
-    y_pred, y_true, feature_maps = [], [], []
-    if torch.cuda.device_count() > 1:
-        model = nn.DataParallel(model)
+    y_pred, y_true, feature_maps, y_proba = [], [], [], []
     model.to(device)
     model.eval()
 
     for batch in tqdm(test_loader, unit="batch", total=len(test_loader)):
         input, output = batch
-        input, _ = input.to(device).float(), output.to(device)
+        input, output = input.to(device).float(), output.to(device)
         features, preds = model(input)
-        _, predicted_class = torch.max(preds.data, 1)
+        probs = torch.softmax(preds, dim=1)
         feature_maps.extend(features.cpu().numpy())
-
-        y_pred.extend(predicted_class.cpu().numpy())
+        y_pred.extend(torch.argmax(probs, dim=1).cpu().numpy())
+        y_proba.extend(probs.cpu().numpy())
         y_true.extend(output.cpu().numpy())
 
     y_pred, y_true = np.asarray(y_pred), np.asarray(y_true)
     feature_maps = np.asarray(feature_maps)
     flattened_features = feature_maps.reshape(feature_maps.shape[0], -1)
-    features_dir = os.path.join(save_dir, "latent_vectors")
-    if not os.path.exists(features_dir):
-        os.makedirs(features_dir)
-    y_pred_dir = os.path.join(save_dir, "y_pred")
-    if not os.path.exists(y_pred_dir):
-        os.makedirs(y_pred_dir)
+
+    features_dir = os.path.join(save_dir, "features")
+    os.makedirs(features_dir, exist_ok=True)
     np.save(
-        f"{features_dir}/latent_vecs_{model_name}_{output_name}.npy", flattened_features
+        f"{features_dir}/features_{model_name}_{output_name}.npy", flattened_features
     )
-    np.save(f"{y_pred_dir}/y_pred_{model_name}_{output_name}.npy", y_pred)
 
-    confusion_matrix_dir = os.path.join(save_dir, "confusion_matrix")
-    if not os.path.exists(confusion_matrix_dir):
-        os.makedirs(confusion_matrix_dir)
+    print("Calibrating classification scores...")
+    calibrator = CalibratedClassifierCV(
+        estimator=LogisticRegression(), method="sigmoid"
+    )
+    calibrator.fit(flattened_features, y_true)
+    calibrated_proba = calibrator.predict_proba(flattened_features)
 
+    proba_dir = os.path.join(save_dir, "calibrated_probs")
+    os.makedirs(proba_dir, exist_ok=True)
+    np.save(
+        f"{proba_dir}/calibrated_probs_{model_name}_{output_name}.npy", calibrated_proba
+    )
+
+    y_pred_calibrated = np.argmax(calibrated_proba, axis=1)
     sklearn_report = classification_report(
-        y_true, y_pred, output_dict=True, target_names=classes
+        y_true, y_pred_calibrated, output_dict=True, target_names=classes
     )
 
-    cf_matrix = confusion_matrix(y_true, y_pred)
+    cf_matrix = confusion_matrix(y_true, y_pred_calibrated)
     df_cm = pd.DataFrame(
         cf_matrix / np.sum(cf_matrix, axis=1)[:, None],
         index=[i for i in classes],
@@ -123,31 +119,47 @@ def compute_metrics(
     )
     plt.figure(figsize=(12, 7))
     sn.heatmap(df_cm, annot=True)
-    plt.title(f"{model_name} Confusion Matrix")
+    plt.title(f"{model_name} Calibrated Confusion Matrix")
     plt.savefig(
         os.path.join(
-            confusion_matrix_dir, f"confusion_matrix_{model_name}_{output_name}.png"
+            save_dir, f"confusion_matrix/confusion_matrix_calibrated_{model_name}_{output_name}.png"
         ),
         bbox_inches="tight",
     )
     plt.close()
 
-    return sklearn_report
+    brier_scores = [
+        brier_score_loss(y_true == i, calibrated_proba[:, i])
+        for i in range(calibrated_proba.shape[1])
+    ]
+    mean_brier_score = float(np.mean(brier_scores))
+
+    ece = float(expected_calibration_error(y_true, calibrated_proba))
+
+    return sklearn_report, ece, mean_brier_score
 
 
 @torch.no_grad()
-def main(
-    model_dir: str,
-    output_name: str,
-    x_test_path: str,
-    y_test_path: str,
-    model_name: str,
-    classes: tuple,
-    dataset: str,
-):
+def main(model_dir: str,
+         output_name: str,
+         x_test_path: str,
+         y_test_path: str,
+         model_name: str,
+         classes: list,
+         dataset: str
+    ) -> None:
+    """Main function to evaluate models with calibration
+
+    Args:
+        model_dir (str): directory containing the models
+        output_name (str): name of the output file
+        x_test_path (str): path to the test images
+        y_test_path (str): path to the test labels
+        model_name (str): name of the model
+        classes (list): list of classes
+    """
     metrics_dir = os.path.join(model_dir, "metrics")
-    if not os.path.exists(metrics_dir):
-        os.makedirs(metrics_dir)
+    os.makedirs(metrics_dir, exist_ok=True)
 
     if dataset in ["shapes", "astronomical_objects"]:
         transform = transforms.Compose(
@@ -176,7 +188,9 @@ def main(
             ]
         )
 
-    test_dataset = dataset_dict[dataset](x_test_path, y_test_path, transform=transform)
+    test_dataset = dataset_dict[dataset](
+        x_test_path, y_test_path, transform=transform
+    )
     test_dataloader = DataLoader(test_dataset, batch_size=128, shuffle=True)
 
     models = load_models(model_dir, model_name, dataset)
@@ -185,44 +199,29 @@ def main(
         return
 
     for model, model_file_name in models:
-        model_metrics = {
-            class_name: {"precision": [], "recall": [], "f1-score": [], "support": []}
-            for class_name in classes
-        }
-        model_metrics["accuracy"] = []
-        model_metrics["macro avg"] = {
-            "precision": [],
-            "recall": [],
-            "f1-score": [],
-            "support": [],
-        }
-        model_metrics["weighted avg"] = {
-            "precision": [],
-            "recall": [],
-            "f1-score": [],
-            "support": [],
-        }
-
-        full_report = compute_metrics(
+        model_metrics, ece, brier_score = compute_metrics_with_calibration(
             test_loader=test_dataloader,
             model=model,
-            model_name=model_name,
+            model_name=model_file_name,
             save_dir=model_dir,
-            output_name=f"{output_name}_{model_file_name}",
+            output_name=output_name,
             classes=classes,
         )
-        model_metrics = full_report
+
+        # Add ECE and Brier score to the metrics
+        model_metrics["ECE"] = ece
+        model_metrics["Brier Score"] = brier_score
 
         print("Compiling Metrics")
         output_file_name = f"{output_name}_{model_file_name}.yaml"
         with open(os.path.join(metrics_dir, output_file_name), "w") as file:
             yaml.dump(model_metrics, file)
 
-        print(f"Metrics saved at {os.path.join(model_dir, output_file_name)}")
+        print(f"Metrics saved at {os.path.join(metrics_dir, output_file_name)}")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Test models")
+    parser = argparse.ArgumentParser(description="Evaluate models with calibration")
     parser.add_argument(
         "--dataset",
         type=str,
@@ -247,7 +246,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model_name", type=str, help="Name of the model to be evaluated"
     )
-    
+
     args = parser.parse_args()
 
     main(

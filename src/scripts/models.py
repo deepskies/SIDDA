@@ -1,226 +1,280 @@
 import torch
 import torch.nn as nn
-from torch.nn import functional as F
 from escnn import gspaces
 from escnn import nn as escnn_nn
-import cnn
-import torchvision
+from torch.nn import functional as F
 from torchsummary import summary
 
-num_classes = 10
-feature_fields = [12, 24, 48, 48, 48, 48, 96, 96, 96, 112, 192]    
 
-class ConvBlock(nn.Module):
-    def __init__(self,
-                 in_type: escnn_nn.FieldType, 
-                 out_type: escnn_nn.FieldType, 
-                 kernel_size: int, 
-                 padding: int, 
-                 stride: int, 
-                 bias: bool, 
-                 mask_module: bool = False
-            ):
-        
-        super(ConvBlock, self).__init__()
-        self.in_type = in_type
-        self.out_type = out_type
-        self.conv = escnn_nn.R2Conv(
-            in_type, out_type, kernel_size=kernel_size, 
-            padding=padding, stride=stride, bias=bias
+class CNN(nn.Module):
+    """CNN model.
+
+    Args:
+        num_channels (int, optional): Number of input channels. Defaults to 1.
+        num_classes (int, optional): Number of classes. Defaults to 3.
+    """
+    def __init__(self, num_channels: int = 1, num_classes: int = 3):
+        super(CNN, self).__init__()
+
+        self.conv1 = nn.Conv2d(
+            in_channels=num_channels, out_channels=8, kernel_size=5, stride=1, padding=2
         )
-        self.bn = escnn_nn.InnerBatchNorm(out_type)
-        self.act = escnn_nn.ReLU(out_type, inplace=True)
-        self.mask_module = mask_module
-        if mask_module:
-            self.mask = escnn_nn.MaskModule(in_type, 255, margin=1)
-    
+        self.bn1 = nn.BatchNorm2d(8)
+        self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
+
+        self.conv2 = nn.Conv2d(
+            in_channels=8, out_channels=16, kernel_size=3, stride=1, padding=1
+        )
+        self.bn2 = nn.BatchNorm2d(16)
+        self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
+
+        self.conv3 = nn.Conv2d(
+            in_channels=16, out_channels=32, kernel_size=3, stride=1, padding=1
+        )
+        self.bn3 = nn.BatchNorm2d(32)
+        self.pool3 = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
+
+        # Bottleneck Layer (Fully Connected)
+        self.fc1 = nn.Linear(in_features=32 * 12 * 12, out_features=256)
+        self.fc1.weight.data.normal_(0, 0.005)
+        self.fc1.bias.data.fill_(0.0)
+        self.layer_norm = nn.LayerNorm(256)
+
+        # Output Layer (Fully Connected)
+        self.fc2 = nn.Linear(in_features=256, out_features=num_classes)
+        self.fc2.weight.data.normal_(0, 0.01)
+        self.fc2.bias.data.fill_(0.0)
+
+        self.dropout = nn.Dropout(p=0.2)
+
     def forward(self, x):
-        if self.mask_module:
-            x = self.mask(x)
-        x = self.conv(x)
-        x = self.bn(x)
-        x = self.act(x)
-        return x
-
-class GeneralSteerableCNN(torch.nn.Module):
-    
-    def __init__(
-        self, N, n_classes=num_classes, 
-        feature_fields = feature_fields, reflections = False, maximum_frequency = None
-    ):
-        super(GeneralSteerableCNN, self).__init__()
-        
-        self.N = N
-        if reflections:
-            self.r2_act = gspaces.flip2dOnR2() if self.N == 1 else gspaces.flipRot2dOnR2(N=self.N)
-        else:
-            self.r2_act = gspaces.rot2dOnR2(N=self.N)
-
-        in_type = escnn_nn.FieldType(self.r2_act, 3*[self.r2_act.trivial_repr])
-        
-        self.input_type = in_type
-        out_type = escnn_nn.FieldType(self.r2_act, feature_fields[0]*[self.r2_act.regular_repr])
-        
-        self.block1 = ConvBlock(in_type, out_type, kernel_size=3, padding=2, stride=2, bias=False, mask_module=True)
-        in_type = self.block1.out_type
-        out_type = escnn_nn.FieldType(self.r2_act, feature_fields[1]*[self.r2_act.regular_repr])
-        self.block2 = ConvBlock(in_type, out_type, kernel_size=3, padding=1, stride=1, bias=False)
-        self.pool1 = escnn_nn.SequentialModule(
-            escnn_nn.PointwiseAvgPoolAntialiased(out_type, sigma=0.66, stride=2)
-        )
-        
-        in_type = self.block2.out_type
-        out_type = escnn_nn.FieldType(self.r2_act, feature_fields[2]*[self.r2_act.regular_repr])
-        self.block3 = ConvBlock(in_type, out_type, kernel_size=3, padding=1, stride=1, bias=False)
-
-        in_type = self.block3.out_type
-        out_type = escnn_nn.FieldType(self.r2_act, feature_fields[3]*[self.r2_act.regular_repr])
-        self.block4 = ConvBlock(in_type, out_type, kernel_size=3, padding=1, stride=1, bias=False)
-        self.pool2 = escnn_nn.SequentialModule(
-            escnn_nn.PointwiseAvgPoolAntialiased(out_type, sigma=0.66, stride=2)
-        )
-        
-        in_type = self.block4.out_type
-        out_type = escnn_nn.FieldType(self.r2_act, feature_fields[4]*[self.r2_act.regular_repr])
-        self.block5 = ConvBlock(in_type, out_type, kernel_size=3, padding=1, stride=1, bias=False)
-
-        in_type = self.block5.out_type
-        out_type = escnn_nn.FieldType(self.r2_act, feature_fields[5]*[self.r2_act.regular_repr])
-        self.block6 = ConvBlock(in_type, out_type, kernel_size=3, padding=1, stride=1, bias=False)
-
-        in_type = self.block6.out_type
-        out_type = escnn_nn.FieldType(self.r2_act, feature_fields[6]*[self.r2_act.regular_repr])
-        self.block7 = ConvBlock(in_type, out_type, kernel_size=3, padding=1, stride=1, bias=False)
-        self.pool3 = escnn_nn.SequentialModule(
-            escnn_nn.PointwiseAvgPoolAntialiased(out_type, sigma=0.66, stride=2)
-        )
-        
-        in_type = self.block7.out_type
-        out_type = escnn_nn.FieldType(self.r2_act, feature_fields[7]*[self.r2_act.regular_repr])
-        self.block8 = ConvBlock(in_type, out_type, kernel_size=3, padding=1, stride=1, bias=False)
-        
-        in_type = self.block8.out_type
-        out_type = escnn_nn.FieldType(self.r2_act, feature_fields[8]*[self.r2_act.regular_repr])
-        self.block9 = ConvBlock(in_type, out_type, kernel_size=3, padding=1, stride=1, bias=False)
-        self.pool4 = escnn_nn.PointwiseAvgPoolAntialiased(out_type, sigma=0.66, stride=2)
-
-        in_type = self.block9.out_type
-        out_type = escnn_nn.FieldType(self.r2_act, feature_fields[9]*[self.r2_act.regular_repr])
-        self.block10 = ConvBlock(in_type, out_type, kernel_size=3, padding=1, stride=1, bias=False)
-
-        in_type = self.block10.out_type
-        out_type = escnn_nn.FieldType(self.r2_act, feature_fields[10]*[self.r2_act.regular_repr])
-        self.block11 = ConvBlock(in_type, out_type, kernel_size=3, padding=1, stride=1, bias=False)
-        self.pool5 = escnn_nn.PointwiseAvgPoolAntialiased(out_type, sigma=0.66, stride=2)
-
-        self.gpool = escnn_nn.GroupPooling(out_type)
-        
-        # number of output channels
-        # b, c, h, w = self.gpool.evaluate_output_shape(self.pool3.out_type)
-        # d = c*h*w
-        c = self.gpool.out_type.size
-        self.fully_net = torch.nn.Sequential(
-            torch.nn.Linear(25*c, 64),
-            torch.nn.BatchNorm1d(64),
-            torch.nn.ELU(inplace=True),
-            torch.nn.Linear(64, 32),
-            torch.nn.BatchNorm1d(32),
-            torch.nn.ELU(inplace=True),
-            torch.nn.Linear(32, n_classes),
-        )
-    
-    def forward(self, input: torch.Tensor):
-        x = escnn_nn.GeometricTensor(input, self.input_type)
-        x = self.block1(x)
-        x = self.block2(x)
+        x = F.relu(self.bn1(self.conv1(x)))
         x = self.pool1(x)
-        x = self.block3(x)
-        x = self.block4(x)
+        x = self.dropout(x)
+
+        x = F.relu(self.bn2(self.conv2(x)))
         x = self.pool2(x)
-        x = self.block5(x)
-        x = self.block6(x)
-        x = self.block7(x)
+        x = self.dropout(x)
+
+        x = F.relu(self.bn3(self.conv3(x)))
         x = self.pool3(x)
-        x = self.block8(x)
-        x = self.block9(x)
-        x = self.pool4(x)
-        x = self.block10(x)
-        x = self.block11(x)
-        x = self.pool5(x)
+        x = self.dropout(x)
+
+        x = x.view(x.size(0), -1)
+
+        x = self.fc1(x)
+        x = self.layer_norm(x)
+        latent_space = x
+
+        x = self.fc2(x)
+
+        return latent_space, x
+
+
+class ENN(nn.Module):
+    """ENN model. Can be equivariant to C_N or D_N. D_4 used for most experiments.
+
+    Args:
+        num_channels (int, optional): Number of input channels. Defaults to 1.
+        num_classes (int, optional): Number of classes. Defaults to 3.
+        input_size (tuple, optional): Input size. Defaults to (100, 100).
+        N (int, optional): Number of rotations. Defaults to 4.
+        dihedral (bool, optional): Whether to use dihedral group. Defaults to True.
+    """
+    def __init__(
+        self,
+        num_channels: int = 1,
+        num_classes: int = 3,
+        input_size: tuple = (100, 100),
+        N=4,
+        dihedral=True,
+    ):
+        super(ENN, self).__init__()
+
+        if N == 1:
+            self.r2_act = gspaces.trivialOnR2()  # D1 group and C1 group
+
+        else:
+            if dihedral:
+                self.r2_act = gspaces.flipRot2dOnR2(
+                    N=N
+                )  # D4 group with 4 rotations and flip
+            else:
+                self.r2_act = gspaces.rot2dOnR2(
+                    N=N
+                )  # D4 group with 4 rotations and flip
+
+        self.input_type = escnn_nn.FieldType(
+            self.r2_act, num_channels * [self.r2_act.trivial_repr]
+        )
+        self.conv1 = escnn_nn.R2Conv(
+            in_type=self.input_type,
+            out_type=escnn_nn.FieldType(self.r2_act, 8 * [self.r2_act.regular_repr]),
+            kernel_size=5,
+            padding=2,
+        )
+        self.bn1 = escnn_nn.InnerBatchNorm(self.conv1.out_type)
+        self.relu1 = escnn_nn.ReLU(self.conv1.out_type)
+        self.pool1 = escnn_nn.PointwiseMaxPool2D(
+            self.conv1.out_type, kernel_size=2, stride=2, padding=0
+        )
+        self.dropout1 = escnn_nn.PointwiseDropout(self.conv1.out_type, p=0.2)
+
+        self.conv2 = escnn_nn.R2Conv(
+            in_type=self.conv1.out_type,
+            out_type=escnn_nn.FieldType(self.r2_act, 16 * [self.r2_act.regular_repr]),
+            kernel_size=3,
+            padding=1,
+        )
+
+        self.bn2 = escnn_nn.InnerBatchNorm(self.conv2.out_type)
+        self.relu2 = escnn_nn.ReLU(self.conv2.out_type)
+        self.pool2 = escnn_nn.PointwiseMaxPool2D(
+            self.conv2.out_type, kernel_size=2, stride=2, padding=0
+        )
+        self.dropout2 = escnn_nn.PointwiseDropout(self.conv2.out_type, p=0.2)
+
+        self.conv3 = escnn_nn.R2Conv(
+            in_type=self.conv2.out_type,
+            out_type=escnn_nn.FieldType(self.r2_act, 32 * [self.r2_act.regular_repr]),
+            kernel_size=3,
+            padding=1,
+        )
+        self.bn3 = escnn_nn.InnerBatchNorm(self.conv3.out_type)
+        self.relu3 = escnn_nn.ReLU(self.conv3.out_type)
+        self.pool3 = escnn_nn.PointwiseMaxPool2D(
+            self.conv3.out_type, kernel_size=2, stride=2, padding=0
+        )
+        self.dropout3 = escnn_nn.PointwiseDropout(self.conv3.out_type, p=0.2)
+
+        self.gpool = escnn_nn.GroupPooling(self.pool3.out_type)
+
+        c = self.gpool.out_type.size
+        dummy_input = torch.zeros(1, num_channels, *input_size)
+        dummy_input = escnn_nn.GeometricTensor(dummy_input, self.input_type)
+        with torch.no_grad():
+            dummy_output = self.gpool(
+                self.pool3(
+                    self.relu3(
+                        self.bn3(
+                            self.conv3(
+                                self.pool2(
+                                    self.relu2(
+                                        self.bn2(
+                                            self.conv2(
+                                                self.pool1(
+                                                    self.relu1(
+                                                        self.bn1(
+                                                            self.conv1(dummy_input)
+                                                        )
+                                                    )
+                                                )
+                                            )
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        flattened_size = dummy_output.tensor.view(1, -1).shape[1]
+
+        self.fc1 = nn.Linear(in_features=flattened_size, out_features=256)
+        self.fc1.weight.data.normal_(0, 0.005)
+        self.fc1.bias.data.fill_(0.0)
+        self.layer_norm = nn.LayerNorm(256)
+
+        self.fc2 = nn.Linear(in_features=256, out_features=num_classes)
+        self.fc2.weight.data.normal_(0, 0.01)
+        self.fc2.bias.data.fill_(0.0)
+
+    def forward(self, x):
+        x = escnn_nn.GeometricTensor(x, self.input_type)
+
+        x = self.pool1(self.relu1(self.bn1(self.conv1(x))))
+        x = self.dropout1(x)
+        x = self.pool2(self.relu2(self.bn2(self.conv2(x))))
+        x = self.dropout2(x)
+        x = self.pool3(self.relu3(self.bn3(self.conv3(x))))
+        x = self.dropout3(x)
+
         x = self.gpool(x)
-        features = x.tensor.squeeze(-1).squeeze(-1) 
-        x = x.tensor
-        x = self.fully_net(x.reshape(x.shape[0], -1))
 
-        return features, x
+        x = x.tensor.view(x.tensor.size(0), -1)
+        x = self.fc1(x)
+        x = self.layer_norm(x)
+        latent_space = x
+
+        x = self.fc2(x)
+
+        return latent_space, x
 
 
-def load_d1():
-    D1_model = GeneralSteerableCNN(N=1,reflections=True)
-    return D1_model
+##############################################################################################
 
-def load_d2():
-    D2_model = GeneralSteerableCNN(N=2,reflections=True)
-    return D2_model
 
-def load_d4():
-    D4_model = GeneralSteerableCNN(N=4,reflections=True)
-    return D4_model
+def cnn_shapes():
+    model = CNN(num_channels=1, num_classes=3)
+    return model
 
-def load_d8():
-    D8_model = GeneralSteerableCNN(N=8,reflections=True)
-    return D8_model
 
-def load_d16():
-    D16_model = GeneralSteerableCNN(N=16,reflections=True)
-    return D16_model
+def cnn_astro_objects():
+    model = CNN(num_channels=1, num_classes=3)
+    return model
 
-def load_d32():
-    D32_model = GeneralSteerableCNN(N=32,reflections=True)
-    return D32_model
 
-def load_d64():
-    D64_model = GeneralSteerableCNN(N=64,reflections=True)
-    return D64_model
+def cnn_mnistm():
+    model = CNN(num_channels=3, num_classes=10)
+    return model
 
-def load_c1():
-    C1_model = GeneralSteerableCNN(N=1)
-    return C1_model
 
-def load_c2():
-    C2_model = GeneralSteerableCNN(N=2)
-    return C2_model
+def cnn_gzevo():
+    model = CNN(num_channels=3, num_classes=6)
+    return model
 
-def load_c4():
-    C4_model = GeneralSteerableCNN(N=4)
-    return C4_model
 
-def load_c8():
-    C8_model = GeneralSteerableCNN(N=8)
-    return C8_model 
+def d4_shapes():
+    model = ENN(
+        num_channels=1, num_classes=3, N=4, dihedral=True, input_size=(100, 100)
+    )
+    return model
 
-def load_c16():
-    C16_model = GeneralSteerableCNN(N=16)
-    return C16_model
 
+def d4_astro_objects():
+    model = ENN(
+        num_channels=1, num_classes=3, N=4, dihedral=True, input_size=(100, 100)
+    )
+    return model
+
+
+def d4_mnistm():
+    model = ENN(num_channels=3, num_classes=10, N=4, dihedral=True, input_size=(32, 32))
+    return model
+
+
+def d4_gzevo():
+    model = ENN(
+        num_channels=3, num_classes=6, N=4, dihedral=True, input_size=(100, 100)
+    )
+    return model
+
+
+## other order D_N models can be constructed by specifcying dihedral = True with varying N
+## cyclic group models can be constructed by specifying dihedral = False with varying N
+
+shapes_models = {"cnn": cnn_shapes, "d4": d4_shapes}
+astro_objects_models = {"cnn": cnn_astro_objects, "d4": d4_astro_objects}
+mnistm_models = {"cnn": cnn_mnistm, "d4": d4_mnistm}
+gz_evo_models = {"cnn": cnn_gzevo, "d4": d4_gzevo}
 
 model_dict = {
-    'D1': load_d1,
-    'D2': load_d2,
-    'D4': load_d4,
-    'D8': load_d8,
-    'D16': load_d16,
-    'D32': load_d32,
-    'D64': load_d64,
-    'C1': load_c1,
-    'C2': load_c2,
-    'C4': load_c4,
-    'C8': load_c8,
-    'C16': load_c16
+    "shapes": shapes_models,
+    "astro_objects": astro_objects_models,
+    "mnist_m": mnistm_models,
+    "gz_evo": gz_evo_models,
 }
 
-if __name__ == '__main__':
-    model = model_dict['D8']()
-    model.eval()
-    
-    summary(model, (3, 255, 255))
+if __name__ == "__main__":
+    model = ENN(num_channels=3, num_classes=10, N=4, dihedral=True, input_size=(28, 28))
+    summary(model, (3, 28, 28))
