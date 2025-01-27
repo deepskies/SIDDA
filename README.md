@@ -118,6 +118,13 @@ These notebooks can be used to reproduce Figures 4 and 5 in the paper. The data 
 ## Citation
 
 ```bibtex
-@misc{}
+@misc{pandya2025siddasinkhorndynamicdomain,
+      title={SIDDA: SInkhorn Dynamic Domain Adaptation for Image Classification with Equivariant Neural Networks}, 
+      author={Sneh Pandya and Purvik Patel and Brian D. Nord and Mike Walmsley and Aleksandra Ćiprijanović},
+      year={2025},
+      eprint={2501.14048},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG},
+      url={https://arxiv.org/abs/2501.14048}, 
 }
 ```
