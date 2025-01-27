@@ -7,7 +7,7 @@
 
 ## Overview
 
-**SInkhorn Dynamic Domain Adaptation (SIDDA)** supplements the experiments presented in *xxxx.xxxx, SIDDA: SInkhorn Dynamic Domain Adaptation for Image Classification with Equivariant Neural Networks*. 
+**SInkhorn Dynamic Domain Adaptation (SIDDA)** supplements the experiments presented in *[2501.14048](https://arxiv.org/abs/2501.14048), SIDDA: SInkhorn Dynamic Domain Adaptation for Image Classification with Equivariant Neural Networks*. 
 
 SIDDA introduces a **semi-supervised, automatic domain adaptation method** that leverages Sinkhorn divergences to dynamically adjust the regularization in the optimal transport plan and the weighting between classification and domain adaptation loss terms during training. 
 
