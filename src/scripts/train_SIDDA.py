@@ -93,6 +93,7 @@ def train_SIDDA(
     max_distances, epoch_max_distances = [], []
     js_distances, epoch_js_distances = [], []
     blur_vals, epoch_blur_vals = [], []
+    eta_1_vals, eta_2_vals = [], []
 
     print("Training Started!")
 
@@ -167,6 +168,8 @@ def train_SIDDA(
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=10.0)
             eta_1.data.clamp_(min=1e-3)
             eta_2.data.clamp_(min=0.25 * eta_1.data.item())
+            eta_1_vals.append(eta_1.item())
+            eta_2_vals.append(eta_2.item())
             optimizer.step()
 
             train_loss += loss.item()
@@ -428,6 +431,15 @@ def train_SIDDA(
         os.path.join(loss_dir, f"epoch_js_distances-{model_name}.npy"),
         np.array(epoch_js_distances),
     )
+    
+    np.save(
+        os.path.join(loss_dir, f"eta_1_vals-{model_name}.npy"), 
+        np.array(eta_1_vals)
+    )
+    np.save(os.path.join(loss_dir, f"eta_2_vals-{model_name}.npy"), 
+            np.array(eta_2_vals)
+    )
+    
 
     # Plotting the losses
     plt.figure(figsize=(14, 8))
@@ -541,6 +553,26 @@ def train_SIDDA(
     plt.tight_layout()
     plt.savefig(os.path.join(loss_dir, f"js_distance_plot-{model_name}.png"))
     plt.close()
+    
+    plt.figure(figsize=(10, 5))
+    
+    plt.plot(steps, eta_1_vals, label="eta_1")
+    plt.plot(steps, eta_2_vals, label="eta_2")
+    plt.axvline(x=best_val_epoch, color="b", linestyle="--", label="Best Val Epoch")
+    plt.axvline(
+        x=best_classification_loss_epoch,
+        color="y",
+        linestyle="--",
+        label="Best Classification Epoch",
+    )
+    plt.axvline(x=best_DA_epoch, color="g", linestyle="--", label="Best DA Epoch")
+    plt.legend()
+    plt.xlabel("Epochs")
+    plt.ylabel("Value")
+    plt.title("Eta Values vs. Training Steps")
+    plt.tight_layout()
+    plt.savefig(os.path.join(loss_dir, f"eta_values_plot-{model_name}.png"))
+    plt.close()    
 
     return (
         best_val_epoch,
