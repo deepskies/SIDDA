@@ -12,30 +12,43 @@ class CNN(nn.Module):
     Args:
         num_channels (int, optional): Number of input channels. Defaults to 1.
         num_classes (int, optional): Number of classes. Defaults to 3.
+        input_size (tuple, optional): Input size. Defaults to (100, 100).
     """
-    def __init__(self, num_channels: int = 1, num_classes: int = 3):
+    def __init__(self, num_channels: int = 1, num_classes: int = 3, input_size: tuple = (100, 100)):
         super(CNN, self).__init__()
 
-        self.conv1 = nn.Conv2d(
-            in_channels=num_channels, out_channels=8, kernel_size=5, stride=1, padding=2
-        )
+        self.conv1 = nn.Conv2d(in_channels=num_channels, out_channels=8, kernel_size=5, stride=1, padding=2)
         self.bn1 = nn.BatchNorm2d(8)
         self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
 
-        self.conv2 = nn.Conv2d(
-            in_channels=8, out_channels=16, kernel_size=3, stride=1, padding=1
-        )
+        self.conv2 = nn.Conv2d(in_channels=8, out_channels=16, kernel_size=3, stride=1, padding=1)
         self.bn2 = nn.BatchNorm2d(16)
         self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
 
-        self.conv3 = nn.Conv2d(
-            in_channels=16, out_channels=32, kernel_size=3, stride=1, padding=1
-        )
+        self.conv3 = nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, stride=1, padding=1)
         self.bn3 = nn.BatchNorm2d(32)
         self.pool3 = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
 
+        self.dropout = nn.Dropout(p=0.2)
+
+        # Compute flattened size dynamically
+        dummy_input = torch.zeros(1, num_channels, *input_size)
+        with torch.no_grad():
+            dummy_output = self.pool3(
+                F.relu(self.bn3(self.conv3(
+                    self.pool2(
+                        F.relu(self.bn2(self.conv2(
+                            self.pool1(
+                                F.relu(self.bn1(self.conv1(dummy_input)))
+                            )
+                        )))
+                    )
+                )))
+            )
+        flattened_size = dummy_output.view(1, -1).shape[1]
+
         # Bottleneck Layer (Fully Connected)
-        self.fc1 = nn.Linear(in_features=32 * 12 * 12, out_features=256)
+        self.fc1 = nn.Linear(in_features=flattened_size, out_features=256)
         self.fc1.weight.data.normal_(0, 0.005)
         self.fc1.bias.data.fill_(0.0)
         self.layer_norm = nn.LayerNorm(256)
@@ -44,8 +57,6 @@ class CNN(nn.Module):
         self.fc2 = nn.Linear(in_features=256, out_features=num_classes)
         self.fc2.weight.data.normal_(0, 0.01)
         self.fc2.bias.data.fill_(0.0)
-
-        self.dropout = nn.Dropout(p=0.2)
 
     def forward(self, x):
         x = F.relu(self.bn1(self.conv1(x)))
@@ -215,22 +226,22 @@ class ENN(nn.Module):
 
 
 def cnn_shapes():
-    model = CNN(num_channels=1, num_classes=3)
+    model = CNN(num_channels=1, num_classes=3, input_size=(100, 100))
     return model
 
 
 def cnn_astro_objects():
-    model = CNN(num_channels=1, num_classes=3)
+    model = CNN(num_channels=1, num_classes=3, input_size=(100, 100))
     return model
 
 
 def cnn_mnistm():
-    model = CNN(num_channels=3, num_classes=10)
+    model = CNN(num_channels=3, num_classes=10, input_size=(32, 32))
     return model
 
 
 def cnn_gzevo():
-    model = CNN(num_channels=3, num_classes=6)
+    model = CNN(num_channels=3, num_classes=6, input_size=(100, 100))
     return model
 
 
@@ -276,5 +287,6 @@ model_dict = {
 }
 
 if __name__ == "__main__":
-    model = ENN(num_channels=3, num_classes=10, N=4, dihedral=True, input_size=(28, 28))
+    # model = ENN(num_channels=3, num_classes=10, N=4, dihedral=True, input_size=(28, 28))
+    model = CNN(num_channels=3, num_classes=10)
     summary(model, (3, 28, 28))
