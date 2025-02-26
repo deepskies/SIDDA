@@ -553,26 +553,6 @@ def train_SIDDA(
     plt.tight_layout()
     plt.savefig(os.path.join(loss_dir, f"js_distance_plot-{model_name}.png"))
     plt.close()
-    
-    plt.figure(figsize=(10, 5))
-    
-    plt.plot(steps, eta_1_vals, label="eta_1")
-    plt.plot(steps, eta_2_vals, label="eta_2")
-    plt.axvline(x=best_val_epoch, color="b", linestyle="--", label="Best Val Epoch")
-    plt.axvline(
-        x=best_classification_loss_epoch,
-        color="y",
-        linestyle="--",
-        label="Best Classification Epoch",
-    )
-    plt.axvline(x=best_DA_epoch, color="g", linestyle="--", label="Best DA Epoch")
-    plt.legend()
-    plt.xlabel("Epochs")
-    plt.ylabel("Value")
-    plt.title("Eta Values vs. Training Steps")
-    plt.tight_layout()
-    plt.savefig(os.path.join(loss_dir, f"eta_values_plot-{model_name}.png"))
-    plt.close()    
 
     return (
         best_val_epoch,
