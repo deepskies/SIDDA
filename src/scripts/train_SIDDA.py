@@ -620,7 +620,7 @@ def main(config):
             [
                 transforms.ToTensor(),
                 transforms.Resize(32),
-                transforms.Normalize(mean=(0.5,), std=(0.5,)),
+                transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)),
             ]
         )
 
@@ -641,7 +641,28 @@ def main(config):
             [
                 transforms.ToTensor(),
                 transforms.Resize(100),
-                transforms.Normalize(mean=(0.5,), std=(0.5,)),
+                transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)),
+            ]
+        )
+        
+    elif dataset_name == "mrssc2":
+        train_transform = transforms.Compose(
+            [
+                transforms.ToTensor(),
+                transforms.RandomRotation(180),
+                transforms.Resize(256),
+                transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
+                transforms.RandomHorizontalFlip(p=0.3),
+                transforms.RandomVerticalFlip(p=0.3),
+                transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)),
+            ]
+        )
+
+        val_transform = transforms.Compose(
+            [
+                transforms.ToTensor(),
+                transforms.Resize(256),
+                transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)),
             ]
         )
 

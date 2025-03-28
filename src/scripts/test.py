@@ -175,6 +175,15 @@ def main(
                 transforms.Resize(100),
             ]
         )
+        
+    elif dataset == "mrssc2":
+        transform = transforms.Compose(
+            [
+                transforms.ToTensor(),
+                transforms.Resize(256),
+                transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)),
+            ]
+        )
 
     test_dataset = dataset_dict[dataset](x_test_path, y_test_path, transform=transform)
     test_dataloader = DataLoader(test_dataset, batch_size=128, shuffle=True)

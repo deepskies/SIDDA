@@ -270,6 +270,14 @@ def d4_gzevo():
     )
     return model
 
+def cnn_mrssc2():
+    model = CNN(num_channels=3, num_classes=7, input_size=(256,256))
+    return model
+
+def d4_mrssc2():
+    model = ENN(num_channels=3, num_classes=7, N=4, dihedral=True, input_size = (256, 256))
+    return model
+
 
 ## other order D_N models can be constructed by specifcying dihedral = True with varying N
 ## cyclic group models can be constructed by specifying dihedral = False with varying N
@@ -278,12 +286,14 @@ shapes_models = {"cnn": cnn_shapes, "d4": d4_shapes}
 astro_objects_models = {"cnn": cnn_astro_objects, "d4": d4_astro_objects}
 mnistm_models = {"cnn": cnn_mnistm, "d4": d4_mnistm}
 gz_evo_models = {"cnn": cnn_gzevo, "d4": d4_gzevo}
+mrssc2_models = {"cnn": cnn_mrssc2, "d4": d4_mrssc2}
 
 model_dict = {
     "shapes": shapes_models,
     "astro_objects": astro_objects_models,
     "mnist_m": mnistm_models,
     "gz_evo": gz_evo_models,
+    "mrssc2": mrssc2_models
 }
 
 if __name__ == "__main__":
