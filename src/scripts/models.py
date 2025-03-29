@@ -278,6 +278,35 @@ def d4_mrssc2():
     model = ENN(num_channels=3, num_classes=7, N=4, dihedral=True, input_size = (256, 256))
     return model
 
+import torch
+import torch.nn as nn
+import torchvision.models as models
+
+def resnet(num_classes, freeze_backbone=True, device='cuda' if torch.cuda.is_available() else 'cpu'):
+    """
+    Loads a ResNet-50 model pretrained on ImageNet, modifies it for a new classification task.
+
+    Args:
+        num_classes (int): Number of output classes for your new dataset.
+        freeze_backbone (bool): If True, freeze all layers except the final classification head.
+        device (str): Device to load the model on.
+
+    Returns:
+        torch.nn.Module: Modified ResNet-50 model ready for training on new dataset.
+    """
+    model = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
+
+    if freeze_backbone:
+        for param in model.parameters():
+            param.requires_grad = False
+
+    # Replace the final fully connected layer
+    in_features = model.fc.in_features
+    model.fc = nn.Linear(in_features, num_classes)
+
+    model = model.to(device)
+    return model
+
 
 ## other order D_N models can be constructed by specifcying dihedral = True with varying N
 ## cyclic group models can be constructed by specifying dihedral = False with varying N
@@ -286,7 +315,7 @@ shapes_models = {"cnn": cnn_shapes, "d4": d4_shapes}
 astro_objects_models = {"cnn": cnn_astro_objects, "d4": d4_astro_objects}
 mnistm_models = {"cnn": cnn_mnistm, "d4": d4_mnistm}
 gz_evo_models = {"cnn": cnn_gzevo, "d4": d4_gzevo}
-mrssc2_models = {"cnn": cnn_mrssc2, "d4": d4_mrssc2}
+mrssc2_models = {"cnn": cnn_mrssc2, "d4": d4_mrssc2, "resnet": resnet(num_classes=7)}
 
 model_dict = {
     "shapes": shapes_models,
