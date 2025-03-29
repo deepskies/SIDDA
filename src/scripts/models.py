@@ -294,7 +294,8 @@ class ResNetWithFeatures(nn.Module):
         return x, out  # returns (features, logits)
 
 
-resnet = ResNetWithFeatures(num_classes=7)
+def resnet():
+    return ResNetWithFeatures(num_classes=7)
 
 ## other order D_N models can be constructed by specifcying dihedral = True with varying N
 ## cyclic group models can be constructed by specifying dihedral = False with varying N
