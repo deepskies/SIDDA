@@ -4,6 +4,7 @@ from escnn import gspaces
 from escnn import nn as escnn_nn
 from torch.nn import functional as F
 from torchsummary import summary
+import torchvision.models as models
 
 
 class CNN(nn.Module):
@@ -278,29 +279,37 @@ def d4_mrssc2():
     model = ENN(num_channels=3, num_classes=7, N=4, dihedral=True, input_size = (256, 256))
     return model
 
-import torchvision.models as models
 
-class ResNetWithFeatures(nn.Module):
-    def __init__(self, num_classes, freeze_backbone=True):
+class ResNetWithBottleneck(nn.Module):
+    def __init__(self, num_classes, bottleneck_dim=256, freeze_backbone=True):
         super().__init__()
         base = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
-        self.features = nn.Sequential(*list(base.children())[:-1])  # everything but the final FC
-        self.classifier = nn.Linear(base.fc.in_features, num_classes)
+        
+        # Use the backbone up to (but not including) the final fc layer
+        self.features = nn.Sequential(*list(base.children())[:-1])  # output shape: (batch_size, 2048, 1, 1)
+        
+        # Bottleneck layer: 2048 → bottleneck_dim (e.g. 256)
+        self.bottleneck = nn.Linear(base.fc.in_features, bottleneck_dim)
+        
+        # Final classifier: bottleneck_dim → num_classes
+        self.classifier = nn.Linear(bottleneck_dim, num_classes)
 
         if freeze_backbone:
             for param in self.features.parameters():
-                param.requires_grad = False  # freeze all backbone layers
+                param.requires_grad = False
 
     def forward(self, x):
-        x = self.features(x)
-        x = x.view(x.size(0), -1)
-        out = self.classifier(x)
-        return x, out
+        x = self.features(x)              # (B, 2048, 1, 1)
+        x = x.view(x.size(0), -1)         # (B, 2048)
+        z = self.bottleneck(x)            # (B, 256)
+        out = self.classifier(z)          # (B, num_classes)
+        return z, out                     # return 256-d latent and logits
+
 
 
 
 def resnet():
-    return ResNetWithFeatures(num_classes=7)
+    return ResNetWithBottleneck(num_classes=7)
 
 ## other order D_N models can be constructed by specifcying dihedral = True with varying N
 ## cyclic group models can be constructed by specifying dihedral = False with varying N
