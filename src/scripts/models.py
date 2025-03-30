@@ -281,17 +281,22 @@ def d4_mrssc2():
 import torchvision.models as models
 
 class ResNetWithFeatures(nn.Module):
-    def __init__(self, num_classes):
+    def __init__(self, num_classes, freeze_backbone=True):
         super().__init__()
         base = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
-        self.features = nn.Sequential(*list(base.children())[:-1])  # everything but the last FC
+        self.features = nn.Sequential(*list(base.children())[:-1])  # everything but the final FC
         self.classifier = nn.Linear(base.fc.in_features, num_classes)
+
+        if freeze_backbone:
+            for param in self.features.parameters():
+                param.requires_grad = False  # freeze all backbone layers
 
     def forward(self, x):
         x = self.features(x)
         x = x.view(x.size(0), -1)
         out = self.classifier(x)
-        return x, out  # returns (features, logits)
+        return x, out
+
 
 
 def resnet():
