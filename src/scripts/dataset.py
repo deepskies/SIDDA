@@ -4,6 +4,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
+from PIL import Image
 
 
 class Shapes(Dataset):
@@ -268,6 +269,9 @@ class MRSSC2(Dataset):
 
     def __getitem__(self, idx: int):
         img = self.img[idx]
+        
+        img = Image.fromarray((img * 255).astype(np.uint8))
+        
         if self.transform:
             img = self.transform(img)
 
