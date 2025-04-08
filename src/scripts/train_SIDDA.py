@@ -722,7 +722,7 @@ def main(config):
     train_dataset, val_dataset = split_dataset(
         train_dataset,
         val_size=config["parameters"]["val_size"],
-        train_transform=train_transform,
+        train_transform=source_train_transform,
         val_transform=source_val_transform,
     )
 
@@ -739,7 +739,7 @@ def main(config):
     target_dataset, val_target_dataset = split_dataset(
         target_dataset,
         val_size=config["parameters"]["val_size"],
-        train_transform=train_transform,
+        train_transform=target_train_transform,
         val_transform=target_val_transform,
     )
 
