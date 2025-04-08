@@ -235,13 +235,13 @@ def main(config):
         target_mean = (0.3900, 0.3900, 0.3900)
         target_std = (0.2468, 0.2468, 0.2468)
 
-        source_train_transform = transforms.Compose(
+        train_transform = transforms.Compose(
             [
                 # Optional: try this to match domains better
                 transforms.Grayscale(num_output_channels=3),
                 transforms.ToTensor(),
                 transforms.RandomRotation(180),
-                transforms.Resize(224),
+                transforms.Resize(100),
                 transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
                 transforms.RandomHorizontalFlip(p=0.3),
                 transforms.RandomVerticalFlip(p=0.3),
@@ -249,19 +249,11 @@ def main(config):
             ]
         )
 
-        source_val_transform = transforms.Compose(
+        val_transform = transforms.Compose(
             [
                 transforms.Grayscale(num_output_channels=3),  # keep consistent
                 transforms.ToTensor(),
-                transforms.Resize(224),
-                transforms.Normalize(mean=target_mean, std=target_std),
-            ]
-        )
-
-        target_transform = transforms.Compose(
-            [
-                transforms.ToTensor(),
-                transforms.Resize(224),
+                transforms.Resize(100),
                 transforms.Normalize(mean=target_mean, std=target_std),
             ]
         )

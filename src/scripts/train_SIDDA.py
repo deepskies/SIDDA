@@ -657,7 +657,7 @@ def main(config):
                 transforms.Grayscale(num_output_channels=3),  # Optional but strongly recommended
                 transforms.ToTensor(),
                 transforms.RandomRotation(180),
-                transforms.Resize(256),
+                transforms.Resize(100),
                 transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
                 transforms.RandomHorizontalFlip(p=0.3),
                 transforms.RandomVerticalFlip(p=0.3),
@@ -669,7 +669,7 @@ def main(config):
             [
                 transforms.Grayscale(num_output_channels=3),
                 transforms.ToTensor(),
-                transforms.Resize(256),
+                transforms.Resize(100),
                 transforms.Normalize(mean=target_mean, std=target_std),
             ]
         )
@@ -678,7 +678,7 @@ def main(config):
             [
                 transforms.ToTensor(),
                 transforms.RandomRotation(180),
-                transforms.Resize(256),
+                transforms.Resize(100),
                 transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
                 transforms.RandomHorizontalFlip(p=0.3),
                 transforms.RandomVerticalFlip(p=0.3),
@@ -689,7 +689,7 @@ def main(config):
         target_val_transform = transforms.Compose(
             [
                 transforms.ToTensor(),
-                transforms.Resize(256),
+                transforms.Resize(100),
                 transforms.Normalize(mean=target_mean, std=target_std),
             ]
         )
