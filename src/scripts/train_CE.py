@@ -229,25 +229,43 @@ def main(config):
         )
         
     elif dataset_name == "mrssc2":
-        train_transform = transforms.Compose(
+        # You already computed these and can hardcode them:
+        source_mean = (0.4231, 0.4270, 0.3997)
+        source_std = (0.2391, 0.2191, 0.2176)
+        target_mean = (0.3900, 0.3900, 0.3900)
+        target_std = (0.2468, 0.2468, 0.2468)
+
+        source_train_transform = transforms.Compose(
             [
+                # Optional: try this to match domains better
+                transforms.Grayscale(num_output_channels=3),
                 transforms.ToTensor(),
                 transforms.RandomRotation(180),
                 transforms.Resize(224),
                 transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
                 transforms.RandomHorizontalFlip(p=0.3),
                 transforms.RandomVerticalFlip(p=0.3),
-                transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)),
+                transforms.Normalize(mean=target_mean, std=target_std),  # match target stats
             ]
         )
 
-        val_transform = transforms.Compose(
+        source_val_transform = transforms.Compose(
+            [
+                transforms.Grayscale(num_output_channels=3),  # keep consistent
+                transforms.ToTensor(),
+                transforms.Resize(224),
+                transforms.Normalize(mean=target_mean, std=target_std),
+            ]
+        )
+
+        target_transform = transforms.Compose(
             [
                 transforms.ToTensor(),
                 transforms.Resize(224),
-                transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)),
+                transforms.Normalize(mean=target_mean, std=target_std),
             ]
         )
+
 
     # Function to split dataset into train and validation subsets
     def split_dataset(dataset, val_size, train_transform, val_transform):
