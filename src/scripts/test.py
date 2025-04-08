@@ -182,7 +182,7 @@ def main(
     [
         transforms.Grayscale(num_output_channels=3) if args.domain == "source" else transforms.Lambda(lambda x: x),
         transforms.ToTensor(),
-        transforms.Resize(256),
+        transforms.Resize(100),
         transforms.Normalize(mean=(0.3900, 0.3900, 0.3900), std=(0.2468, 0.2468, 0.2468)),
     ]
 )
