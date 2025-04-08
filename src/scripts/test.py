@@ -177,13 +177,15 @@ def main(
         )
         
     elif dataset == "mrssc2":
+        
         transform = transforms.Compose(
-            [
-                transforms.ToTensor(),
-                transforms.Resize(256),
-                transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)),
-            ]
-        )
+    [
+        transforms.Grayscale(num_output_channels=3) if args.domain == "source" else transforms.Lambda(lambda x: x),
+        transforms.ToTensor(),
+        transforms.Resize(256),
+        transforms.Normalize(mean=(0.3900, 0.3900, 0.3900), std=(0.2468, 0.2468, 0.2468)),
+    ]
+)
 
     test_dataset = dataset_dict[dataset](x_test_path, y_test_path, transform=transform)
     test_dataloader = DataLoader(test_dataset, batch_size=128, shuffle=True)
@@ -255,6 +257,9 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--model_name", type=str, help="Name of the model to be evaluated"
+    )
+    parser.add_argument(
+        "--domain", type=str, default="source", help="Domain to be used for evaluation"
     )
     
     args = parser.parse_args()
