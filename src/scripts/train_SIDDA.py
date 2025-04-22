@@ -107,70 +107,74 @@ def train_SIDDA(
         train_loss = 0.0
         classification_losses, DA_losses = [], []
 
-        for i, (batch, target_batch) in tqdm(
-            enumerate(zip(train_dataloader, target_dataloader))
-        ):
+        for (batch, target_batch) in tqdm(zip(train_dataloader, target_dataloader)):
             source_inputs, source_outputs = batch
-            source_inputs, source_outputs = (
-                source_inputs.to(device).float(),
-                source_outputs.to(device),
-            )
+            source_inputs = source_inputs.to(device).float()
+            source_outputs = source_outputs.to(device)
 
             target_inputs, _ = target_batch
             target_inputs = target_inputs.to(device).float()
 
             optimizer.zero_grad()
 
+            # --- warmup: only classification ---
             if epoch < warmup:
-                _, model_outputs = model(source_inputs)
-                classification_loss = F.cross_entropy(model_outputs, source_outputs)
+                out_s = model(source_inputs)
+                logits_s = out_s['logits']
+                classification_loss = F.cross_entropy(logits_s, source_outputs)
                 loss = classification_loss
                 DA_loss = None
+
             else:
-                concatenated_inputs = torch.cat((source_inputs, target_inputs), dim=0)
-                batch_size = source_inputs.size(0)
+                # 1) concatenate and forward
+                concatenated = torch.cat([source_inputs, target_inputs], dim=0)
+                out = model(concatenated)
+                feats = out['features']    # list of 4 tensors, each shape (2B, D_ℓ)
+                logits = out['logits']     # shape (2B, num_classes)
 
-                features, model_outputs = model(concatenated_inputs)
-                source_features = features[:batch_size]
-                target_features = features[batch_size:]
-                source_model_outputs = model_outputs[:batch_size]
+                # 2) split back
+                B = source_inputs.size(0)
+                src_feats = [f[:B] for f in feats]
+                tgt_feats = [f[B:] for f in feats]
+                logits_s = logits[:B]
 
-                classification_loss = F.cross_entropy(
-                    source_model_outputs, source_outputs
-                )
+                # 3) classification loss
+                classification_loss = F.cross_entropy(logits_s, source_outputs)
 
-                pairwise_distances = torch.cdist(source_features, target_features, p=2)
-                flattened_distances = pairwise_distances.view(-1)
-                max_distance = torch.max(flattened_distances)
-                max_distances.append(max_distance.detach().cpu().numpy())
-                js_distances.append(
-                    jensen_shannon_distance(source_features, target_features)
-                    .nanmean()
-                    .item()
-                )
+                # 4) compute dynamic blur from the *last* feature level
+                last_sf, last_tf = src_feats[-1], tgt_feats[-1]
+                pairwise_distances = torch.cdist(last_sf, last_tf, p=2).view(-1)
+                max_distance = pairwise_distances.max().detach().cpu().item()
+                dynamic_blur = max(0.05 * max_distance, 0.01)
 
-                dynamic_blur_val = 0.05 * max_distance.detach().cpu().numpy()
-                blur_vals.append(dynamic_blur_val)
+                # 5) Sinkhorn on each layer, **normalized** by its dim
+                DA_loss = 0.0
+                for sf, tf in zip(src_feats, tgt_feats):
+                    D = sf.size(1)
+                    DA_loss += sinkhorn_loss(sf, tf, blur=dynamic_blur) / D
 
-                DA_loss = sinkhorn_loss(
-                    source_features,
-                    target_features,
-                    blur=max(dynamic_blur_val, 0.01),  # Apply lower bound to blur
-                )
-
+                # 6) total loss with learned η’s
                 loss = (
                     (1 / (2 * eta_1**2)) * classification_loss
                     + (1 / (2 * eta_2**2)) * DA_loss
                     + torch.log(torch.abs(eta_1) * torch.abs(eta_2))
                 )
 
+            # --- backward & step ---
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=10.0)
+
+            # keep your η’s in their bounds
             eta_1.data.clamp_(min=1e-3)
             eta_2.data.clamp_(min=0.25 * eta_1.data.item())
-            eta_1_vals.append(eta_1.item())
-            eta_2_vals.append(eta_2.item())
+
             optimizer.step()
+
+        # bookkeeping
+        classification_losses.append(classification_loss.item())
+        if DA_loss is not None:
+            DA_losses.append(DA_loss.item())
+
 
             train_loss += loss.item()
             classification_losses.append(classification_loss.item())
@@ -216,93 +220,87 @@ def train_SIDDA(
 
         if (epoch + 1) % report_interval == 0:
             model.eval()
-            source_correct, source_total, val_loss = (
-                0,
-                0,
-                0.0,
-            )
-            val_classification_loss, val_DA_loss = 0.0, 0.0
+            source_correct = 0
+            source_total   = 0
+            val_loss               = 0.0
+            val_classification_loss = 0.0
+            val_DA_loss            = 0.0
 
             with torch.no_grad():
-                for i, (batch, target_batch) in enumerate(
-                    zip(val_dataloader, target_val_dataloader)
-                ):
-                    source_inputs, source_outputs = batch
-                    source_inputs, source_outputs = (
-                        source_inputs.to(device).float(),
-                        source_outputs.to(device),
-                    )
-                    target_inputs, _ = target_batch
-                    target_inputs, _ = (
-                        target_inputs.to(device).float(),
-                        _.to(device),
-                    )
+                for (batch, target_batch) in zip(val_dataloader, target_val_dataloader):
+                    # unpack & send to device
+                    source_inputs, source_labels = batch
+                    source_inputs  = source_inputs.to(device).float()
+                    source_labels  = source_labels.to(device)
 
+                    target_inputs, _ = target_batch
+                    target_inputs   = target_inputs.to(device).float()
+
+                    # --- warmup: only classification ---
                     if epoch < warmup:
-                        _, source_preds = model(source_inputs)
-                        classification_loss_ = F.cross_entropy(
-                            source_preds, source_outputs
-                        )
-                        combined_loss = classification_loss_
-                        DA_loss_ = 0.0
+                        out_s = model(source_inputs)
+                        logits_s = out_s['logits']
+                        classification_loss = F.cross_entropy(logits_s, source_labels)
+                        DA_loss = 0.0
+                        combined_loss = classification_loss
 
                     else:
-                        concatenated_inputs = torch.cat(
-                            (source_inputs, target_inputs), dim=0
-                        )
-                        batch_size = source_inputs.size(0)
+                        # forward on concatenated batch
+                        concatenated = torch.cat([source_inputs, target_inputs], dim=0)
+                        out = model(concatenated)
+                        feats  = out['features']   # list of 4 tensors, each (2B, D_ℓ)
+                        logits = out['logits']     # (2B, num_classes)
 
-                        features, preds = model(concatenated_inputs)
-                        source_features = features[:batch_size]
-                        target_features = features[batch_size:]
-                        source_preds = preds[:batch_size]
+                        B = source_inputs.size(0)
+                        # split source / target
+                        src_feats = [f[:B] for f in feats]
+                        tgt_feats = [f[B:] for f in feats]
+                        logits_s  = logits[:B]
 
-                        classification_loss_ = F.cross_entropy(
-                            source_preds, source_outputs
-                        )
+                        # classification loss
+                        classification_loss = F.cross_entropy(logits_s, source_labels)
 
-                        pairwise_distances = torch.cdist(
-                            source_features, target_features, p=2
-                        )
-                        flattened_distances = pairwise_distances.view(-1)
-                        max_distance = torch.max(flattened_distances)
+                        # compute global blur from last layer
+                        last_sf, last_tf = src_feats[-1], tgt_feats[-1]
+                        max_dist = torch.cdist(last_sf, last_tf, p=2).max().item()
+                        blur     = max(0.05 * max_dist, 0.01)
 
-                        dynamic_blur_val = 0.05 * max_distance.detach().cpu().numpy()
-                        DA_loss_ = sinkhorn_loss(
-                            source_features,
-                            target_features,
-                            blur=max(dynamic_blur_val, 0.01),
-                        )
+                        # normalized Sinkhorn on every layer
+                        DA_loss = 0.0
+                        for sf, tf in zip(src_feats, tgt_feats):
+                            D = sf.size(1)
+                            DA_loss += sinkhorn_loss(sf, tf, blur=blur) / D
 
-                        combined_loss = classification_loss_ + DA_loss_
+                        combined_loss = classification_loss + DA_loss
 
-                    val_loss += combined_loss.item()
-                    val_classification_loss += classification_loss_.item()
-
+                    # accumulate
+                    val_loss               += combined_loss.item()
+                    val_classification_loss += classification_loss.item()
                     if epoch >= warmup:
-                        val_DA_loss += DA_loss_.item()
+                        val_DA_loss += DA_loss.item()
 
-                    _, source_predicted = torch.max(source_preds.data, 1)
-                    source_total += source_outputs.size(0)
-                    source_correct += (source_predicted == source_outputs).sum().item()
+                    # accuracy
+                    preds = logits_s.argmax(dim=1)
+                    source_total   += source_labels.size(0)
+                    source_correct += (preds == source_labels).sum().item()
 
-            source_val_acc = 100 * source_correct / source_total
-
-            val_loss /= len(val_dataloader)
-            val_classification_loss /= len(val_dataloader)
-
+            # normalize by number of val batches
+            n = len(val_dataloader)
+            val_loss               /= n
+            val_classification_loss /= n
             if epoch >= warmup:
-                val_DA_loss /= len(val_dataloader)
+                val_DA_loss /= n
 
+            source_val_acc = 100.0 * source_correct / source_total
+
+            # store / report
             val_losses.append(val_loss)
             val_classification_losses.append(val_classification_loss)
             val_DA_losses.append(val_DA_loss)
 
-            lr = (
-                scheduler.get_last_lr()[0]
+            lr = (scheduler.get_last_lr()[0]
                 if scheduler is not None
-                else optimizer.param_groups[0]["lr"]
-            )
+                else optimizer.param_groups[0]['lr'])
 
             if epoch < warmup:
                 print(
