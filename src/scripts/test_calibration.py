@@ -95,7 +95,7 @@ def compute_metrics_with_calibration(
 
     print("Calibrating classification scores...")
     calibrator = CalibratedClassifierCV(
-        estimator=LogisticRegression(), method="sigmoid"
+        estimator=LogisticRegression(max_iter=1000), method="sigmoid"
     )
     calibrator.fit(flattened_features, y_true)
     calibrated_proba = calibrator.predict_proba(flattened_features)
@@ -192,7 +192,7 @@ def main(model_dir: str,
         transform = transforms.Compose(
             [
                 transforms.ToTensor(),
-                transforms.Resize(256),
+                transforms.Resize(100),
                 transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)),
             ]
         )

@@ -271,11 +271,11 @@ def d4_gzevo():
     return model
 
 def cnn_mrssc2():
-    model = CNN(num_channels=3, num_classes=7, input_size=(256,256))
+    model = CNN(num_channels=3, num_classes=7, input_size=(100, 100))
     return model
 
 def d4_mrssc2():
-    model = ENN(num_channels=3, num_classes=7, N=4, dihedral=True, input_size = (256, 256))
+    model = ENN(num_channels=3, num_classes=7, N=4, dihedral=True, input_size = (100, 100))
     return model
 
 
