@@ -56,79 +56,88 @@ def load_models(directory_path: str,
 
 @torch.no_grad()
 def compute_metrics(
-    test_loader: DataLoader,
-    model: nn.Module,
+    test_loader: torch.utils.data.DataLoader,
+    model: torch.nn.Module,
     model_name: str,
     save_dir: str,
     output_name: str,
     classes: tuple,
 ):
-    """Compute metrics for the model
-
-    Args:
-        test_loader (nn.DataLoader): test data loader
-        model (nn.Module): model to be evaluated
-        model_name (str): name of the model
-        save_dir (str): directory to save the results
-        output_name (str): name of the output file
-        classes (tuple): classes to be evaluated
+    """Compute metrics for the model with multi-layer latents.
 
     Returns:
-        sklearn_report (dict): sklearn classification report
+        sklearn_report (dict)
     """
+    device = next(model.parameters()).device
+    y_pred, y_true = [], []
+    latent_batches = []
 
-    y_pred, y_true, feature_maps = [], [], []
+    # support multi-gpu
     if torch.cuda.device_count() > 1:
-        model = nn.DataParallel(model)
-    model.to(device)
+        model = torch.nn.DataParallel(model)
     model.eval()
 
-    for batch in tqdm(test_loader, unit="batch", total=len(test_loader)):
-        input, output = batch
-        input, _ = input.to(device).float(), output.to(device)
-        features, preds = model(input)
-        _, predicted_class = torch.max(preds.data, 1)
-        feature_maps.extend(features.cpu().numpy())
+    with torch.no_grad():
+        for inputs, labels in tqdm(test_loader, unit="batch"):
+            # send to device
+            inputs = inputs.to(device).float()
+            labels = labels.to(device)
 
-        y_pred.extend(predicted_class.cpu().numpy())
-        y_true.extend(output.cpu().numpy())
+            # forward
+            out = model(inputs)
+            feats = out['features']    # list of 4 tensors shape (B, Dₗ)
+            logits = out['logits']     # (B, num_classes)
 
-    y_pred, y_true = np.asarray(y_pred), np.asarray(y_true)
-    feature_maps = np.asarray(feature_maps)
-    flattened_features = feature_maps.reshape(feature_maps.shape[0], -1)
+            # prediction
+            preds = logits.argmax(dim=1)
+            y_pred.extend(preds.cpu().numpy())
+            y_true.extend(labels.cpu().numpy())
+
+            # concatenate layer-features → one vector per sample
+            # feats = [ (B,8), (B,16), (B,32), (B,256) ] → cat → (B,312)
+            cat_feats = torch.cat(feats, dim=1)
+            latent_batches.append(cat_feats.cpu().numpy())
+
+    # stack all batches into (N, 312) array
+    latent_vectors = np.vstack(latent_batches)
+
+    # save latents
     features_dir = os.path.join(save_dir, "latent_vectors")
-    if not os.path.exists(features_dir):
-        os.makedirs(features_dir)
-    y_pred_dir = os.path.join(save_dir, "y_pred")
-    if not os.path.exists(y_pred_dir):
-        os.makedirs(y_pred_dir)
+    os.makedirs(features_dir, exist_ok=True)
     np.save(
-        f"{features_dir}/latent_vecs_{model_name}_{output_name}.npy", flattened_features
+        os.path.join(features_dir, f"latents_{model_name}_{output_name}.npy"),
+        latent_vectors
     )
-    np.save(f"{y_pred_dir}/y_pred_{model_name}_{output_name}.npy", y_pred)
 
-    confusion_matrix_dir = os.path.join(save_dir, "confusion_matrix")
-    if not os.path.exists(confusion_matrix_dir):
-        os.makedirs(confusion_matrix_dir)
+    # save predictions
+    y_pred = np.asarray(y_pred)
+    y_true = np.asarray(y_true)
+    y_pred_dir = os.path.join(save_dir, "y_pred")
+    os.makedirs(y_pred_dir, exist_ok=True)
+    np.save(
+        os.path.join(y_pred_dir, f"y_pred_{model_name}_{output_name}.npy"),
+        y_pred
+    )
 
+    # classification report
     sklearn_report = classification_report(
-        y_true, y_pred, output_dict=True, target_names=classes
+        y_true, y_pred, target_names=classes, output_dict=True
     )
 
-    cf_matrix = confusion_matrix(y_true, y_pred)
+    # normalized confusion matrix
+    cm = confusion_matrix(y_true, y_pred)
     df_cm = pd.DataFrame(
-        cf_matrix / np.sum(cf_matrix, axis=1)[:, None],
-        index=[i for i in classes],
-        columns=[i for i in classes],
+        cm / cm.sum(axis=1, keepdims=True),
+        index=classes, columns=classes
     )
-    plt.figure(figsize=(12, 7))
-    sn.heatmap(df_cm, annot=True)
+    cm_dir = os.path.join(save_dir, "confusion_matrix")
+    os.makedirs(cm_dir, exist_ok=True)
+    plt.figure(figsize=(12,7))
+    sn.heatmap(df_cm, annot=True, fmt=".2f")
     plt.title(f"{model_name} Confusion Matrix")
     plt.savefig(
-        os.path.join(
-            confusion_matrix_dir, f"confusion_matrix_{model_name}_{output_name}.png"
-        ),
-        bbox_inches="tight",
+        os.path.join(cm_dir, f"confusion_matrix_{model_name}_{output_name}.png"),
+        bbox_inches="tight"
     )
     plt.close()
 
@@ -180,7 +189,7 @@ def main(
         transform = transforms.Compose(
             [
                 transforms.ToTensor(),
-                transforms.Resize(256),
+                transforms.Resize(100),
                 transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)),
             ]
         )
