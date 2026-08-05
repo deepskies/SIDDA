@@ -1,4 +1,5 @@
 import argparse
+import copy
 import os
 import random
 import time
@@ -11,7 +12,7 @@ import yaml
 from dataset import dataset_dict
 from models import model_dict
 from torch import nn, optim
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader, Subset, random_split
 from torchvision import transforms
 from tqdm import tqdm
 
@@ -256,9 +257,19 @@ def main(config):
 
         train_subset, val_subset = random_split(dataset, [train_size, val_size])
 
-        # Apply transforms
-        train_subset.dataset.transform = train_transform
-        val_subset.dataset.transform = val_transform
+        # Apply transforms. random_split's Subsets share the SAME underlying `dataset`
+        # object by reference, so setting .transform on one and then the other would
+        # silently overwrite the first (both ending up on val_transform) -- give each
+        # split its own shallow copy of the dataset object so their .transform
+        # attributes don't alias. copy.copy() does not duplicate the underlying
+        # img/label numpy arrays, only the thin wrapper object.
+        train_dataset = copy.copy(dataset)
+        val_dataset = copy.copy(dataset)
+        train_dataset.transform = train_transform
+        val_dataset.transform = val_transform
+
+        train_subset = Subset(train_dataset, train_subset.indices)
+        val_subset = Subset(val_dataset, val_subset.indices)
 
         return train_subset, val_subset
 
