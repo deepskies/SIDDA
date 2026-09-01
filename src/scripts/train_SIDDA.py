@@ -317,26 +317,27 @@ def train_SIDDA(
                     f"Epoch: {epoch + 1}, Validation Classification Loss: {val_classification_loss:.4e}, Validation DA Loss: {val_DA_loss:.4e}"
                 )
 
-            if val_loss < best_total_val_loss and epoch >= warmup:
-                best_total_val_loss = val_loss
-                best_val_epoch = epoch + 1
-                no_improvement_count = 0  # reset on improvement, matching train_CE.py
-                if torch.cuda.device_count() > 1:
-                    torch.save(
-                        model.eval().module.state_dict(),
-                        os.path.join(save_dir, "best_model_total_val_loss.pt"),
+            if epoch >= warmup:
+                if val_loss < best_total_val_loss:
+                    best_total_val_loss = val_loss
+                    best_val_epoch = epoch + 1
+                    no_improvement_count = 0  # reset on improvement, matching train_CE.py
+                    if torch.cuda.device_count() > 1:
+                        torch.save(
+                            model.eval().module.state_dict(),
+                            os.path.join(save_dir, "best_model_total_val_loss.pt"),
+                        )
+                    else:
+                        torch.save(
+                            model.eval().state_dict(),
+                            os.path.join(save_dir, "best_model_total_val_loss.pt"),
+                        )
+                    print(
+                        f"Saved best total validation loss model at epoch {best_val_epoch}"
                     )
+                
                 else:
-                    torch.save(
-                        model.eval().state_dict(),
-                        os.path.join(save_dir, "best_model_total_val_loss.pt"),
-                    )
-                print(
-                    f"Saved best total validation loss model at epoch {best_val_epoch}"
-                )
-
-            else:
-                no_improvement_count += 1
+                    no_improvement_count += 1
 
             if source_val_acc >= best_val_acc:
                 best_val_acc = source_val_acc
