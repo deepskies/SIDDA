@@ -1,4 +1,5 @@
 import argparse
+import copy
 import os
 import random
 import time
@@ -12,7 +13,7 @@ import yaml
 from dataset import dataset_dict
 from models import model_dict
 from torch import nn, optim
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader, Subset, random_split
 from torchvision import transforms
 from tqdm import tqdm
 
@@ -116,7 +117,7 @@ def train_SIDDA(
                 source_outputs.to(device),
             )
 
-            target_inputs, _ = target_batch
+            target_inputs = target_batch
             target_inputs = target_inputs.to(device).float()
 
             optimizer.zero_grad()
@@ -232,11 +233,8 @@ def train_SIDDA(
                         source_inputs.to(device).float(),
                         source_outputs.to(device),
                     )
-                    target_inputs, _ = target_batch
-                    target_inputs, _ = (
-                        target_inputs.to(device).float(),
-                        _.to(device),
-                    )
+                    target_inputs = target_batch
+                    target_inputs = target_inputs.to(device).float()
 
                     if epoch < warmup:
                         _, source_preds = model(source_inputs)
@@ -319,25 +317,27 @@ def train_SIDDA(
                     f"Epoch: {epoch + 1}, Validation Classification Loss: {val_classification_loss:.4e}, Validation DA Loss: {val_DA_loss:.4e}"
                 )
 
-            if val_loss < best_total_val_loss and epoch >= warmup:
-                best_total_val_loss = val_loss
-                best_val_epoch = epoch + 1
-                if torch.cuda.device_count() > 1:
-                    torch.save(
-                        model.eval().module.state_dict(),
-                        os.path.join(save_dir, "best_model_total_val_loss.pt"),
+            if epoch >= warmup:
+                if val_loss < best_total_val_loss:
+                    best_total_val_loss = val_loss
+                    best_val_epoch = epoch + 1
+                    no_improvement_count = 0  # reset on improvement, matching train_CE.py
+                    if torch.cuda.device_count() > 1:
+                        torch.save(
+                            model.eval().module.state_dict(),
+                            os.path.join(save_dir, "best_model_total_val_loss.pt"),
+                        )
+                    else:
+                        torch.save(
+                            model.eval().state_dict(),
+                            os.path.join(save_dir, "best_model_total_val_loss.pt"),
+                        )
+                    print(
+                        f"Saved best total validation loss model at epoch {best_val_epoch}"
                     )
+                
                 else:
-                    torch.save(
-                        model.eval().state_dict(),
-                        os.path.join(save_dir, "best_model_total_val_loss.pt"),
-                    )
-                print(
-                    f"Saved best total validation loss model at epoch {best_val_epoch}"
-                )
-
-            else:
-                no_improvement_count += 1
+                    no_improvement_count += 1
 
             if source_val_acc >= best_val_acc:
                 best_val_acc = source_val_acc
@@ -673,9 +673,19 @@ def main(config):
 
         train_subset, val_subset = random_split(dataset, [train_size, val_size])
 
-        # Apply transforms
-        train_subset.dataset.transform = train_transform
-        val_subset.dataset.transform = val_transform
+        # Apply transforms. random_split's Subsets share the SAME underlying `dataset`
+        # object by reference, so setting .transform on one and then the other would
+        # silently overwrite the first (both ending up on val_transform) -- give each
+        # split its own shallow copy of the dataset object so their .transform
+        # attributes don't alias. copy.copy() does not duplicate the underlying
+        # img/label numpy arrays, only the thin wrapper object.
+        train_dataset = copy.copy(dataset)
+        val_dataset = copy.copy(dataset)
+        train_dataset.transform = train_transform
+        val_dataset.transform = val_transform
+
+        train_subset = Subset(train_dataset, train_subset.indices)
+        val_subset = Subset(val_dataset, val_subset.indices)
 
         return train_subset, val_subset
 
@@ -697,13 +707,19 @@ def main(config):
         val_transform=val_transform,
     )
 
-    # Load target dataset
+    # Load target dataset. target_domain=True so __getitem__ returns images only (no
+    # labels) -- target labels are unused during training (see below), and without this
+    # flag the Dataset would try to np.load(target_output_path) and, if that config
+    # value is ever None or omitted (as the example YAML's own comment claims is
+    # supported), crash with AttributeError on the first __getitem__ call since
+    # self.label would never get set.
     target_dataset = dataset_dict[dataset_name](
         input_path=config["train_data"]["target_input_path"],
         output_path=config["train_data"][
             "target_output_path"
         ],  ## outputs dont get used in training
         transform=train_transform,
+        target_domain=True,
     )
 
     # Split target dataset into train and validation sets
@@ -718,17 +734,25 @@ def main(config):
     print(f"Datasets loaded and split in {end - start} seconds")
 
     # Dataloaders can be created if needed
+    # drop_last=True on all four: source and target domains can have different dataset
+    # sizes (e.g. mrssc2's 4924 optical vs 4809 SAR images), so without drop_last their
+    # final batch of an epoch can differ in size. zip(train_dataloader,
+    # target_dataloader) pairs those batches positionally regardless of size, and
+    # jensen_shannon_distance(source_features, target_features) then crashes with a
+    # shape-mismatch RuntimeError on `p + q` whenever the paired batch sizes differ.
     train_dataloader = DataLoader(
         train_dataset,
         batch_size=config["parameters"]["batch_size"],
         shuffle=True,
         pin_memory=True,
+        drop_last=True,
     )
     val_dataloader = DataLoader(
         val_dataset,
         batch_size=config["parameters"]["batch_size"],
         shuffle=False,
         pin_memory=True,
+        drop_last=True,
     )
 
     target_dataloader = DataLoader(
@@ -736,12 +760,14 @@ def main(config):
         batch_size=config["parameters"]["batch_size"],
         shuffle=True,
         pin_memory=True,
+        drop_last=True,
     )
     target_val_dataloader = DataLoader(
         val_target_dataset,
         batch_size=config["parameters"]["batch_size"],
         shuffle=False,
         pin_memory=True,
+        drop_last=True,
     )
 
     timestr = time.strftime("%Y%m%d-%H%M%S")

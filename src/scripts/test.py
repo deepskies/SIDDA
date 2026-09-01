@@ -177,10 +177,14 @@ def main(
         )
         
     elif dataset == "mrssc2":
+        # Resize(100) to match cnn_mrssc2()'s input_size=(100, 100) and
+        # train_CE.py/train_SIDDA.py/test_calibration.py's mrssc2 transforms --
+        # Resize(256) here mismatched the model's fixed FC1 input dimension and would
+        # crash with a matmul shape error at inference time.
         transform = transforms.Compose(
             [
                 transforms.ToTensor(),
-                transforms.Resize(256),
+                transforms.Resize(100),
                 transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)),
             ]
         )
